@@ -2,6 +2,10 @@
 
 > An infinite, collaborative music discovery playground where users explore a procedurally generated world of vinyl records, drop their favorite YouTube/Spotify tracks, and gather in real-time listening rooms.
 
+## 📖 Documentation
+
+- **[VISUALIZATION.md](./VISUALIZATION.md)** - Comprehensive guide to what the application looks like, visual elements, UI components, and how to run it locally
+
 ## Features
 
 - **Infinite Canvas**: Drag and scroll through an endless universe of music using a custom DOM-based engine.
@@ -22,6 +26,20 @@
   - **iTunes Search API** (Global music data)
   - **Noembed** (YouTube/Spotify metadata parsing)
 - **Visuals**: SVG-based map projections, CSS3 hardware-accelerated animations.
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Open http://localhost:5173 in your browser
+```
+
+For detailed setup instructions and visual documentation, see [VISUALIZATION.md](./VISUALIZATION.md).
 
 ## Usage
 
