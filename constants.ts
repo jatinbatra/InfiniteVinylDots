@@ -1,8 +1,8 @@
 export const CANVAS_OPTS = {
   MIN_SCALE: 0.2, // Allow zooming out further to see the whole world
   MAX_SCALE: 4,
-  DOT_BASE_SIZE: 40,
-  DOT_HOVER_SIZE: 180,
+  DOT_BASE_SIZE: 64,
+  DOT_HOVER_SIZE: 200,
   DOT_ACTIVE_SIZE: 350,
   BUFFER: 500, // Pixels to render outside viewport
   FRICTION: 0.9,
