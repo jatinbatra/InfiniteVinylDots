@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSunDirection } from '../utils/geoUtils';
+import { generateEarthTexture } from '../utils/earthTexture';
 
 const GLOBE_RADIUS = 2;
 
@@ -20,6 +21,7 @@ const vertexShader = `
 `;
 
 const fragmentShader = `
+  uniform sampler2D earthMap;
   uniform vec3 sunDirection;
   uniform float time;
 
@@ -28,48 +30,34 @@ const fragmentShader = `
   varying vec2 vUv;
 
   void main() {
+    // Sample the earth texture
+    vec4 texColor = texture2D(earthMap, vUv);
+
     // Day/night factor based on sun direction
     float daylight = dot(normalize(vNormal), normalize(sunDirection));
     daylight = smoothstep(-0.15, 0.35, daylight);
 
-    // Base colors
-    vec3 dayColor = vec3(0.04, 0.06, 0.14);    // dark blue
-    vec3 nightColor = vec3(0.008, 0.008, 0.025); // very dark navy
+    // Day side: show texture brighter + slight blue tint
+    vec3 dayTint = vec3(0.7, 0.85, 1.0);
+    vec3 dayColor = texColor.rgb * dayTint * 2.5;
+
+    // Night side: show texture dimmer + warm city lights pop more
+    float luminance = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+    vec3 nightColor = texColor.rgb * 0.6 + vec3(luminance * 0.3, luminance * 0.2, luminance * 0.05);
+
     vec3 baseColor = mix(nightColor, dayColor, daylight);
 
-    // Grid lines (lat/lng)
-    float latFreq = 18.0; // 10-degree intervals
-    float lngFreq = 36.0; // 10-degree intervals
-    float latLine = 1.0 - smoothstep(0.0, 0.02, abs(sin(vUv.y * 3.14159 * latFreq)));
-    float lngLine = 1.0 - smoothstep(0.0, 0.02, abs(sin(vUv.x * 3.14159 * lngFreq)));
-    float grid = max(latLine, lngLine);
+    // Terminator line glow (orange band at day/night border)
+    float terminator = 1.0 - smoothstep(0.0, 0.1, abs(daylight - 0.5));
+    vec3 terminatorColor = vec3(1.0, 0.4, 0.1) * terminator * 0.2;
 
-    // Equator and prime meridian (thicker)
-    float equator = 1.0 - smoothstep(0.0, 0.004, abs(vUv.y - 0.5));
-    float primeMeridian = 1.0 - smoothstep(0.0, 0.004, abs(vUv.x - 0.5));
-    float majorLines = max(equator, primeMeridian);
+    // Subtle atmosphere scatter on edges
+    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+    float rim = 1.0 - max(0.0, dot(viewDir, vNormal));
+    rim = pow(rim, 4.0);
+    vec3 rimColor = vec3(0.0, 0.5, 1.0) * rim * 0.3 * (0.5 + 0.5 * daylight);
 
-    // Grid color with day/night modulation
-    vec3 gridColor = vec3(0.0, 0.85, 1.0); // cyan
-    float gridIntensity = grid * 0.08 * (0.3 + 0.7 * daylight);
-    float majorIntensity = majorLines * 0.15 * (0.4 + 0.6 * daylight);
-
-    // City lights on night side (subtle sparkle)
-    float nightLights = (1.0 - daylight);
-    float sparkle = fract(sin(dot(vUv * 500.0, vec2(12.9898, 78.233))) * 43758.5453);
-    sparkle = step(0.997, sparkle) * nightLights * 0.4;
-    vec3 lightColor = vec3(1.0, 0.9, 0.6); // warm yellow
-
-    // Terminator line glow
-    float terminator = 1.0 - smoothstep(0.0, 0.08, abs(daylight - 0.5));
-    vec3 terminatorColor = vec3(1.0, 0.4, 0.1) * terminator * 0.15;
-
-    // Compose
-    vec3 finalColor = baseColor
-      + gridColor * gridIntensity
-      + gridColor * majorIntensity
-      + lightColor * sparkle
-      + terminatorColor;
+    vec3 finalColor = baseColor + terminatorColor + rimColor;
 
     gl_FragColor = vec4(finalColor, 1.0);
   }
@@ -83,16 +71,27 @@ const Earth: React.FC<EarthProps> = ({ radius = GLOBE_RADIUS }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
-  const uniforms = useMemo(() => ({
-    sunDirection: { value: getSunDirection() },
-    time: { value: 0 },
-  }), []);
+  const { texture, uniforms } = useMemo(() => {
+    const canvas = generateEarthTexture();
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
 
-  // Update sun direction every frame (smooth movement)
+    return {
+      texture: tex,
+      uniforms: {
+        earthMap: { value: tex },
+        sunDirection: { value: getSunDirection() },
+        time: { value: 0 },
+      },
+    };
+  }, []);
+
   useFrame((_, delta) => {
     if (materialRef.current) {
       materialRef.current.uniforms.time.value += delta;
-      // Update sun position every few seconds (no need for every frame)
       if (Math.floor(materialRef.current.uniforms.time.value) % 5 === 0) {
         materialRef.current.uniforms.sunDirection.value.copy(getSunDirection());
       }

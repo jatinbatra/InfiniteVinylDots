@@ -34,7 +34,7 @@ const fragmentShader = `
     // Atmosphere color - cyan with slight blue shift
     vec3 atmosphereColor = vec3(0.0, 0.7, 1.0);
 
-    gl_FragColor = vec4(atmosphereColor, intensity * 0.35);
+    gl_FragColor = vec4(atmosphereColor, intensity * 0.5);
   }
 `;
 
