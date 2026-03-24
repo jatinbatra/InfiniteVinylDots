@@ -18,6 +18,17 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      build: {
+        chunkSizeWarningLimit: 800,
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              three: ['three'],
+              'r3f': ['@react-three/fiber', '@react-three/drei'],
+            }
+          }
+        }
       }
     };
 });

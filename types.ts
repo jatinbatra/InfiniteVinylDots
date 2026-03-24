@@ -5,28 +5,37 @@ export interface Position {
 
 export interface VinylRecord {
   id: string;
-  albumId: string; // Internal or API specific ID
+  albumId: string;
   title: string;
   artist: string;
   year: number;
   coverUrl: string;
-  previewUrl?: string; // URL for the 30s audio preview (iTunes)
+  previewUrl?: string;
   sourceType?: 'itunes' | 'youtube' | 'spotify';
-  externalId?: string; // YouTube Video ID or Spotify Track ID
-  position: Position;
+  externalId?: string;
+
+  // Geographic position
+  lat?: number;
+  lng?: number;
+  position: Position; // legacy 2D position
+
   listenerCount: number;
   genre: string[];
   isPlaying: boolean;
-  isOwner: boolean; // Is this the current user's dropped vinyl?
+  isOwner: boolean;
   addedBy?: string;
-  description?: string; // AI generated description
-  
-  // Social Features
+  description?: string;
+
+  // Social
   likes: number;
   isLiked: boolean;
   isJoined: boolean;
   isFollowed: boolean;
-  ownerAvatar?: string; // For the "Added by" user
+  ownerAvatar?: string;
+
+  // Circadian
+  circadianColor?: string;
+  circadianMood?: string;
 }
 
 export interface CanvasState {
@@ -41,7 +50,6 @@ export interface Viewport {
   maxY: number;
 }
 
-// Gemini specific types for our service
 export interface AlbumInsight {
   vibe: string;
   trivia: string;
@@ -55,7 +63,7 @@ export interface Region {
 }
 
 export interface Chunk {
-  id: string; // Region Code or "x,y"
+  id: string;
   status: 'loading' | 'loaded' | 'error';
   data: VinylRecord[];
 }

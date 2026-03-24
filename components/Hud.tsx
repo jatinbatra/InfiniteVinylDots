@@ -1,19 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { VinylRecord } from '../types';
+import { REGIONS } from '../constants';
+import { getCircadianMood, formatLocalTime } from '../services/circadianService';
 
 interface HudProps {
   onDropVinyl: () => void;
   myVinyl?: VinylRecord;
   vinylCount?: number;
   regionCount?: number;
+  totalRegions?: number;
 }
 
-const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionCount = 0 }) => {
+const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionCount = 0, totalRegions = 24 }) => {
+  // Live clock
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sample moods from a few key cities
+  const sampleCities = [
+    { name: 'NYC', lng: -74 },
+    { name: 'London', lng: 0 },
+    { name: 'Tokyo', lng: 139.7 },
+    { name: 'São Paulo', lng: -46.6 },
+  ];
+
+  const isLoading = regionCount < totalRegions;
+
   return (
     <>
       {/* Top Left: Logo & Controls */}
       <div className="fixed top-5 left-5 z-50 flex flex-col gap-3">
-        {/* Logo */}
         <div className="flex items-center gap-3 select-none">
           <div className="w-10 h-10 rounded-full border-[3px] border-white flex items-center justify-center bg-black/50 backdrop-blur-sm relative">
             <div className="w-2.5 h-2.5 bg-accent rounded-full animate-pulse" />
@@ -24,7 +43,7 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
               VINYL<span className="text-accent">VERSE</span>
             </div>
             <div className="text-[9px] text-zinc-500 uppercase tracking-[0.3em] font-medium">
-              The World Is Your Playlist
+              Circadian 3D Globe
             </div>
           </div>
         </div>
@@ -44,14 +63,45 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
             <div className="text-sm font-medium">Drop Your Vinyl</div>
           </div>
         </button>
+
+        {/* Circadian mood ticker */}
+        <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/50 rounded-xl p-3 space-y-2 max-w-[220px]">
+          <div className="text-[9px] text-zinc-500 uppercase tracking-[0.2em] font-bold">
+            Live Moods Around the World
+          </div>
+          {sampleCities.map(city => {
+            const mood = getCircadianMood(city.lng);
+            const localTime = formatLocalTime(city.lng);
+            return (
+              <div key={city.name} className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: mood.color }} />
+                  <span className="text-[11px] text-zinc-300 font-medium truncate">{city.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded border border-white/5" style={{ color: mood.color }}>
+                    {mood.name}
+                  </span>
+                  <span className="text-[9px] text-zinc-600 font-mono">{localTime}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Top Right: Stats */}
-      <div className="fixed top-5 right-5 z-50 flex items-center gap-3">
+      <div className="fixed top-5 right-5 z-50 flex flex-col items-end gap-2">
         <div className="bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/50 rounded-lg px-3 py-2 flex items-center gap-4 text-[11px] font-mono">
           <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-zinc-400">{regionCount} regions</span>
+            {isLoading ? (
+              <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
+            ) : (
+              <div className="w-1.5 h-1.5 bg-green-400 rounded-full" />
+            )}
+            <span className="text-zinc-400">
+              {regionCount}/{totalRegions} regions
+            </span>
           </div>
           <div className="w-px h-3 bg-zinc-700" />
           <div className="flex items-center gap-1.5">
@@ -59,9 +109,14 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
             <span className="text-zinc-400">{vinylCount} vinyls</span>
           </div>
         </div>
+
+        {/* UTC Clock */}
+        <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/30 rounded-lg px-3 py-1.5 text-[10px] font-mono text-zinc-500">
+          UTC {time.getUTCHours().toString().padStart(2, '0')}:{time.getUTCMinutes().toString().padStart(2, '0')}:{time.getUTCSeconds().toString().padStart(2, '0')}
+        </div>
       </div>
 
-      {/* Bottom Left: Now Playing Mini */}
+      {/* Bottom Left: Now Playing */}
       <div className="fixed bottom-5 left-5 z-50">
         {myVinyl && (
           <div className="bg-zinc-900/90 backdrop-blur-xl border border-gold/20 rounded-xl p-3 flex items-center gap-3 shadow-2xl max-w-xs">
@@ -69,7 +124,7 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
               <img
                 src={myVinyl.coverUrl}
                 className="w-11 h-11 rounded-full animate-[spin_6s_linear_infinite] object-cover"
-                alt="Playing"
+                alt=""
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-2 h-2 bg-black rounded-full" />
@@ -80,24 +135,31 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
               <div className="text-sm text-white truncate font-medium">{myVinyl.title}</div>
               <div className="text-[10px] text-zinc-500 truncate">{myVinyl.artist}</div>
             </div>
-            <div className="h-5 flex gap-[2px] items-end ml-2 flex-shrink-0">
-              <div className="w-[3px] bg-accent rounded-full h-2 animate-[pulse_0.4s_ease-in-out_infinite]" />
-              <div className="w-[3px] bg-accent rounded-full h-4 animate-[pulse_0.6s_ease-in-out_infinite]" />
-              <div className="w-[3px] bg-accent rounded-full h-3 animate-[pulse_0.5s_ease-in-out_infinite]" />
-              <div className="w-[3px] bg-accent rounded-full h-1.5 animate-[pulse_0.7s_ease-in-out_infinite]" />
-            </div>
           </div>
         )}
       </div>
 
-      {/* Bottom Right: Controls hint */}
+      {/* Bottom Right: Controls */}
       <div className="fixed bottom-5 right-5 z-50 text-right pointer-events-none">
         <div className="bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/30 rounded-lg px-3 py-2">
           <p className="text-[10px] text-zinc-500 font-medium">
-            <span className="text-zinc-400">Drag</span> to pan &middot; <span className="text-zinc-400">Scroll</span> to zoom &middot; <span className="text-zinc-400">Hover</span> to preview
+            <span className="text-zinc-400">Drag</span> to rotate &middot; <span className="text-zinc-400">Scroll</span> to zoom &middot; <span className="text-zinc-400">Hover</span> to preview
           </p>
         </div>
       </div>
+
+      {/* Loading overlay */}
+      {regionCount === 0 && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/70 backdrop-blur-lg border border-zinc-800 rounded-2xl px-8 py-6 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 rounded-full border-[3px] border-accent border-t-transparent animate-spin" />
+            <div className="text-center">
+              <div className="text-white font-bold text-lg">Loading the World</div>
+              <div className="text-zinc-500 text-sm">Fetching music from across the globe...</div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
