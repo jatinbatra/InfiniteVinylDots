@@ -1,5 +1,6 @@
 import { VinylRecord, Position } from '../types';
-import { getCircadianSearchTerm, getCircadianMood } from './circadianService';
+import { getCircadianMood } from './circadianService';
+import { REGIONAL_GENRES } from '../constants';
 
 // --- Audio Manager for smooth playback ---
 class AudioManager {
@@ -90,17 +91,33 @@ export const fetchLinkMetadata = async (url: string): Promise<{ title?: string; 
   }
 };
 
-// --- iTunes API Integration (Circadian-aware) ---
+// --- iTunes API Integration (Region-aware + Circadian) ---
+
+/**
+ * Pick a search term that reflects the region's actual local music scene.
+ * Falls back to a generic genre if no regional mapping exists.
+ */
+function getRegionalSearchTerm(regionCode: string): string {
+  const genres = REGIONAL_GENRES[regionCode];
+  if (genres && genres.length > 0) {
+    return genres[Math.floor(Math.random() * genres.length)];
+  }
+  // Fallback — generic popular music terms
+  const fallback = ['pop', 'hip hop', 'rock', 'electronic', 'r&b'];
+  return fallback[Math.floor(Math.random() * fallback.length)];
+}
 
 export const fetchRegionalTracks = async (
   regionCode: string,
   centerLat: number,
-  centerLng: number
+  centerLng: number,
+  cityName?: string
 ): Promise<VinylRecord[]> => {
   try {
-    // Use circadian-aware genre based on the region's local time
-    const searchTerm = getCircadianSearchTerm(centerLng);
+    // Use region-specific genre so Lagos gets afrobeats, Tokyo gets j-pop, etc.
+    const searchTerm = getRegionalSearchTerm(regionCode);
     const mood = getCircadianMood(centerLng);
+    const key = cityName || regionCode;
 
     const response = await fetch(
       `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=50`
@@ -109,12 +126,12 @@ export const fetchRegionalTracks = async (
     if (!data.results) return [];
 
     return data.results.map((item: any, index: number) => {
-      // Golden angle scatter around the region center
+      // Golden angle scatter — tighter radius for city-level clustering
       const angle = (index * 137.5) * (Math.PI / 180);
-      const radius = Math.sqrt(index) * 60;
+      const radius = Math.sqrt(index) * 25; // ~25km spread around city center
 
       return {
-        id: `${regionCode}-${item.trackId}`,
+        id: `${key}-${item.trackId}`,
         albumId: item.collectionId,
         title: item.trackName,
         artist: item.artistName,
@@ -122,10 +139,9 @@ export const fetchRegionalTracks = async (
         coverUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100', '600x600') : '',
         previewUrl: item.previewUrl,
         sourceType: 'itunes' as const,
-        // Store lat/lng for 3D positioning
-        lat: centerLat + (Math.sin(angle) * radius) / 111, // rough km-to-deg
+        lat: centerLat + (Math.sin(angle) * radius) / 111,
         lng: centerLng + (Math.cos(angle) * radius) / (111 * Math.cos(centerLat * Math.PI / 180)),
-        position: { x: 0, y: 0 }, // legacy, unused in 3D mode
+        position: { x: 0, y: 0 },
         listenerCount: Math.floor(Math.random() * 1000) + 50,
         genre: [item.primaryGenreName || searchTerm],
         isPlaying: Math.random() > 0.4,

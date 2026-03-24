@@ -152,13 +152,13 @@ const GlobeContent: React.FC<{
       <OrbitControls
         enablePan={false}
         enableDamping
-        dampingFactor={0.08}
-        minDistance={GLOBE_RADIUS * 1.3}
-        maxDistance={GLOBE_RADIUS * 8}
-        rotateSpeed={0.7}
-        zoomSpeed={1.2}
+        dampingFactor={0.2}
+        minDistance={GLOBE_RADIUS * 1.5}
+        maxDistance={GLOBE_RADIUS * 5}
+        rotateSpeed={0.35}
+        zoomSpeed={0.5}
         autoRotate
-        autoRotateSpeed={0.15}
+        autoRotateSpeed={0.08}
       />
     </>
   );

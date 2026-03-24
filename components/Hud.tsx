@@ -144,7 +144,7 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
               </svg>
             </button>
           ) : (
-            <div className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 rounded-xl p-4 max-w-[240px] space-y-3 relative">
+            <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-800/50 rounded-xl p-4 max-w-[280px] space-y-3 relative">
               <button
                 onClick={() => setAboutOpen(false)}
                 className="absolute top-2 right-2 text-zinc-500 hover:text-white transition-colors"
@@ -156,30 +156,53 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0, regionC
 
               <div>
                 <div className="text-white font-bold text-sm">VinylVerse</div>
-                <div className="text-[10px] text-[#00D9FF] font-medium mt-0.5">A Circadian 3D Globe of Music</div>
+                <div className="text-[10px] text-[#00D9FF] font-medium mt-0.5">Infinite Vinyl Dots on a Living Globe</div>
               </div>
 
-              <p className="text-[10px] text-zinc-400 leading-relaxed">
-                Explore music from around the world, changing with the time of day.
-                Each glowing dot is a track playing somewhere on Earth right now.
+              <p className="text-[11px] text-zinc-300 leading-relaxed">
+                Hover over any region on Earth and hear what people there are actually listening to.
+                Lagos plays afrobeats. Tokyo plays city pop. Berlin plays techno.
+                The music changes with the time of day — morning energy, night owl vibes, late-night ambient.
               </p>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-zinc-500">Created by</span>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                I built this because music is the most universal thing we have, but we only ever hear
+                what the algorithm feeds us. I wanted to make something where you could just spin a globe
+                and discover what's playing on the other side of the world right now.
+              </p>
+
+              <div className="border-t border-zinc-800 pt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00D9FF] to-[#845EC2] flex items-center justify-center text-[10px] font-black text-white">JB</div>
+                  <div>
+                    <div className="text-white text-xs font-bold">Jatin Batra</div>
+                    <div className="text-[10px] text-zinc-500">Builder & music nerd</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://x.com/jatinbatra_"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-zinc-400 hover:text-[#00D9FF] transition-colors flex items-center gap-1 font-medium"
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    @jatinbatra_
+                  </a>
                   <a
                     href="https://github.com/jatinbatra"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[#00D9FF] hover:underline font-medium"
+                    className="text-[10px] text-zinc-400 hover:text-[#00D9FF] transition-colors flex items-center gap-1 font-medium"
                   >
-                    @jatinbatra
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
                   </a>
                 </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <span className="text-zinc-500">Built with</span>
-                  <span className="text-zinc-300">React, Three.js, iTunes API</span>
-                </div>
+              </div>
+
+              <div className="text-[9px] text-zinc-600 border-t border-zinc-800 pt-2">
+                React + Three.js + iTunes API &middot; 100+ cities worldwide
               </div>
             </div>
           )}

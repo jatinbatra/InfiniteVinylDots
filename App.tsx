@@ -5,7 +5,7 @@ import Hud from './components/Hud';
 import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
-import { getCircadianMood, getCircadianSearchTerm } from './services/circadianService';
+
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
 
@@ -41,38 +41,36 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Load all regions on mount (globe shows everything)
+  // Load all city-regions on mount — uses city name as unique key
   useEffect(() => {
     const loadAllRegions = async () => {
-      // Stagger loading to avoid rate-limiting
       for (let i = 0; i < REGIONS.length; i++) {
         const r = REGIONS[i];
+        const key = r.name; // unique per city
 
-        // Skip if already loaded
-        if (regionsRef.current[r.code]) continue;
+        if (regionsRef.current[key]) continue;
 
-        // Mark as loading
         setRegions(prev => ({
           ...prev,
-          [r.code]: { id: r.code, status: 'loading', data: [] }
+          [key]: { id: key, status: 'loading', data: [] }
         }));
 
         try {
-          const vinyls = await fetchRegionalTracks(r.code, r.lat, r.lng);
+          const vinyls = await fetchRegionalTracks(r.code, r.lat, r.lng, r.name);
           setRegions(prev => ({
             ...prev,
-            [r.code]: { id: r.code, status: 'loaded', data: vinyls }
+            [key]: { id: key, status: 'loaded', data: vinyls }
           }));
         } catch {
           setRegions(prev => ({
             ...prev,
-            [r.code]: { id: r.code, status: 'error', data: [] }
+            [key]: { id: key, status: 'error', data: [] }
           }));
         }
 
         // Small delay between requests to be nice to the API
         if (i < REGIONS.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     };
@@ -171,7 +169,7 @@ const App: React.FC = () => {
     setSelectedVinyl(newVinyl);
   };
 
-  // Circadian refresh: refresh regions periodically with time-appropriate music
+  // Circadian refresh: periodically refresh a random city with fresh regional music
   useEffect(() => {
     const interval = setInterval(() => {
       const loadedKeys = Object.keys(regionsRef.current).filter(
@@ -179,55 +177,21 @@ const App: React.FC = () => {
       );
       if (loadedKeys.length === 0) return;
 
-      // Pick a random region to refresh
       const randomKey = loadedKeys[Math.floor(Math.random() * loadedKeys.length)];
-      const region = REGIONS.find(r => r.code === randomKey);
+      const region = REGIONS.find(r => r.name === randomKey);
       if (!region) return;
 
-      const searchTerm = getCircadianSearchTerm(region.lng);
-      const mood = getCircadianMood(region.lng);
-
-      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${randomKey}&entity=song&limit=50`)
-        .then(res => res.json())
-        .then(data => {
-          if (!data.results || data.results.length === 0) return;
-
-          const newVinyls: VinylRecord[] = data.results.map((item: any, index: number) => {
-            const angle = (index * 137.5) * (Math.PI / 180);
-            const radius = Math.sqrt(index) * 60;
-            return {
-              id: `${randomKey}-refresh-${item.trackId}-${Date.now()}`,
-              albumId: item.collectionId,
-              title: item.trackName,
-              artist: item.artistName,
-              year: new Date(item.releaseDate).getFullYear(),
-              coverUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100', '600x600') : '',
-              previewUrl: item.previewUrl,
-              sourceType: 'itunes' as const,
-              lat: region.lat + (Math.sin(angle) * radius) / 111,
-              lng: region.lng + (Math.cos(angle) * radius) / (111 * Math.cos(region.lat * Math.PI / 180)),
-              position: { x: 0, y: 0 },
-              listenerCount: Math.floor(Math.random() * 1000) + 50,
-              genre: [item.primaryGenreName || searchTerm],
-              isPlaying: Math.random() > 0.4,
-              isOwner: false,
-              likes: Math.floor(Math.random() * 500),
-              isLiked: false,
-              isJoined: false,
-              isFollowed: false,
-              ownerAvatar: `https://i.pravatar.cc/150?u=${item.artistName?.replace(/\s/g, '')}`,
-              circadianColor: mood.color,
-              circadianMood: mood.name,
-            };
-          });
-
+      // Re-fetch with a fresh regional genre
+      fetchRegionalTracks(region.code, region.lat, region.lng, region.name)
+        .then(newVinyls => {
+          if (newVinyls.length === 0) return;
           setRegions(prev => ({
             ...prev,
             [randomKey]: { id: randomKey, status: 'loaded', data: newVinyls }
           }));
         })
         .catch(() => {});
-    }, 30000); // Refresh every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
