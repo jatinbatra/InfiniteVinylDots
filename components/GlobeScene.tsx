@@ -6,7 +6,7 @@ import Earth, { GLOBE_RADIUS } from './Earth';
 import Atmosphere from './Atmosphere';
 import VinylMarker3D from './VinylMarker3D';
 import { VinylRecord } from '../types';
-import { getSunDirection } from '../utils/geoUtils';
+import { getSunDirection, latLngToSphere } from '../utils/geoUtils';
 
 interface GlobeSceneProps {
   vinyls: VinylRecord[];
