@@ -131,7 +131,11 @@ export const fetchRegionalTracks = async (regionCode: string, centerLat: number,
   try {
     // Search for "music" or "hits" in specific country
     // We limit to 25 to populate the region without overcrowding
-    const response = await fetch(`https://itunes.apple.com/search?term=music&country=${regionCode}&entity=song&limit=25`);
+    // Use genre-diverse search terms per region for variety
+    const terms = ['pop', 'rock', 'hip hop', 'electronic', 'jazz', 'soul', 'indie', 'r&b', 'dance', 'latin'];
+    const termIndex = regionCode.charCodeAt(0) % terms.length;
+    const searchTerm = terms[termIndex];
+    const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=25`);
     const data: any = await response.json();
 
     if (!data.results) return [];
@@ -181,7 +185,7 @@ export const fetchRegionalTracks = async (regionCode: string, centerLat: number,
 
 export const fetchTrackSearch = async (term: string): Promise<VinylRecord[]> => {
     try {
-        const response = await fetch(`https://itunes.apple.com/search?term=${term}&entity=song&limit=1`);
+        const response = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=1`);
         const data: any = await response.json();
         if (data.results && data.results.length > 0) {
             const item = data.results[0];

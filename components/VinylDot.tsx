@@ -5,29 +5,30 @@ import { audioManager } from '../services/musicService';
 
 interface VinylDotProps {
   vinyl: VinylRecord;
-  scale: number; // Current canvas scale
+  scale: number;
   onClick: (vinyl: VinylRecord) => void;
+  audioUnlocked?: boolean;
 }
 
-const VinylDot: React.FC<VinylDotProps> = ({ vinyl, scale, onClick }) => {
+const VinylDot: React.FC<VinylDotProps> = ({ vinyl, scale, onClick, audioUnlocked }) => {
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
-  // Dynamic sizing based on listeners and hover state
-  const baseSize = vinyl.listenerCount > 50 ? 60 : CANVAS_OPTS.DOT_BASE_SIZE;
-  
-  // Visual scaling logic
-  const textScale = Math.max(0.4, 1 / scale);
+  const baseSize = vinyl.listenerCount > 50 ? 55 : CANVAS_OPTS.DOT_BASE_SIZE;
+  const hoverSize = CANVAS_OPTS.DOT_HOVER_SIZE;
+
+  // Inverse scale for text so it stays readable at any zoom
+  const textScale = Math.max(0.5, Math.min(2, 1 / scale));
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    // Debounce audio start slightly to avoid cacophony when panning fast
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
     hoverTimeout.current = setTimeout(() => {
-        if (vinyl.previewUrl) {
-            audioManager.play(vinyl.previewUrl);
-        }
-    }, 200);
+      if (vinyl.previewUrl && audioUnlocked) {
+        audioManager.play(vinyl.previewUrl);
+      }
+    }, 300);
   };
 
   const handleMouseLeave = () => {
@@ -36,98 +37,145 @@ const VinylDot: React.FC<VinylDotProps> = ({ vinyl, scale, onClick }) => {
     audioManager.stop();
   };
 
-  // Cleanup on unmount
+  const handlePointerDown = (e: React.PointerEvent) => {
+    mouseDownPos.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    // Only trigger click if the pointer didn't move much (not a drag)
+    if (mouseDownPos.current) {
+      const dx = Math.abs(e.clientX - mouseDownPos.current.x);
+      const dy = Math.abs(e.clientY - mouseDownPos.current.y);
+      if (dx < 5 && dy < 5) {
+        e.stopPropagation();
+        audioManager.stop();
+        onClick(vinyl);
+      }
+    }
+    mouseDownPos.current = null;
+  };
+
   useEffect(() => {
     return () => {
-        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    }
+      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    };
   }, []);
 
   return (
     <div
-      className="absolute transform-gpu transition-all duration-500 ease-out cursor-pointer flex items-center justify-center group"
+      className="absolute transform-gpu transition-all duration-300 ease-out cursor-pointer flex items-center justify-center group"
       style={{
         left: vinyl.position.x,
         top: vinyl.position.y,
-        width: isHovered ? CANVAS_OPTS.DOT_HOVER_SIZE : baseSize,
-        height: isHovered ? CANVAS_OPTS.DOT_HOVER_SIZE : baseSize,
-        transform: `translate(-50%, -50%)`,
+        width: isHovered ? hoverSize : baseSize,
+        height: isHovered ? hoverSize : baseSize,
+        transform: 'translate(-50%, -50%)',
         zIndex: isHovered ? 50 : 1
       }}
-      onClick={(e) => {
-        e.stopPropagation();
-        audioManager.stop(); // Stop hover preview when clicking to open modal
-        onClick(vinyl);
-      }}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {/* The Vinyl Disc Visual */}
-      <div 
+      {/* Outer glow ring on hover */}
+      {isHovered && (
+        <div
+          className="absolute rounded-full animate-ping"
+          style={{
+            width: hoverSize + 20,
+            height: hoverSize + 20,
+            border: '1px solid rgba(0, 217, 255, 0.3)',
+            left: -10,
+            top: -10,
+          }}
+        />
+      )}
+
+      {/* The vinyl disc */}
+      <div
         className={`
-          w-full h-full rounded-full border border-opacity-20 flex items-center justify-center overflow-hidden
-          transition-all duration-300 shadow-[0_0_15px_rgba(255,255,255,0.1)]
-          ${vinyl.isOwner ? 'border-gold shadow-[0_0_15px_rgba(255,215,0,0.4)]' : 'border-white'}
-          ${isHovered ? 'shadow-[0_0_50px_rgba(0,217,255,0.6)] border-accent' : ''}
-          ${vinyl.isPlaying ? 'animate-pulse-slow' : ''}
-          bg-black relative
+          w-full h-full rounded-full overflow-hidden relative
+          transition-all duration-300
+          ${vinyl.isOwner ? 'ring-2 ring-gold shadow-[0_0_20px_rgba(255,215,0,0.4)]' : ''}
+          ${isHovered ? 'shadow-[0_0_40px_rgba(0,217,255,0.5)] ring-2 ring-accent' : 'shadow-[0_0_10px_rgba(255,255,255,0.05)]'}
         `}
       >
-        {/* Album Art */}
-        <img 
-          src={vinyl.coverUrl} 
+        {/* Album art */}
+        <img
+          src={vinyl.coverUrl}
           alt={vinyl.title}
           className={`
-            w-full h-full object-cover transition-opacity duration-300
-            ${isHovered ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}
-            ${vinyl.isOwner ? 'opacity-100' : ''}
-            ${vinyl.isPlaying && !isHovered ? 'animate-[spin_10s_linear_infinite]' : ''}
+            w-full h-full object-cover transition-all duration-500
+            ${isHovered ? 'opacity-100 scale-105' : 'opacity-50'}
+            ${vinyl.isPlaying && !isHovered ? 'animate-[spin_8s_linear_infinite]' : ''}
           `}
           loading="lazy"
+          draggable={false}
         />
 
-        {/* Center hole / Label */}
-        <div className={`absolute w-[15%] h-[15%] bg-black rounded-full z-10 border border-white/10 flex items-center justify-center`}>
-            {vinyl.isPlaying && !isHovered && (
-                <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></div>
-            )}
-        </div>
+        {/* Vinyl grooves overlay */}
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none"
+          style={{
+            background: isHovered
+              ? 'none'
+              : 'repeating-radial-gradient(circle at center, transparent 0px, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)',
+          }}
+        />
 
-        {/* Hover overlay ring */}
-        {isHovered && (
-            <div className="absolute inset-0 rounded-full border-2 border-accent animate-ping opacity-20"></div>
-        )}
+        {/* Center hole */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className={`w-[14%] h-[14%] bg-black rounded-full border border-white/10 flex items-center justify-center`}>
+            {vinyl.isPlaying && (
+              <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Hover Information / Floating Label */}
-      <div 
+      {/* Hover tooltip */}
+      <div
         className={`
-          absolute -top-16 left-1/2 -translate-x-1/2 w-64 text-center pointer-events-none
-          transition-all duration-300 flex flex-col items-center z-[60]
-          ${isHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
+          absolute pointer-events-none z-[60]
+          transition-all duration-300 flex flex-col items-center
+          ${isHovered ? 'opacity-100' : 'opacity-0'}
         `}
-        style={{ transform: `translate(-50%, ${isHovered ? '-20px' : '10px'}) scale(${textScale})` }}
+        style={{
+          bottom: '100%',
+          left: '50%',
+          transform: `translate(-50%, ${isHovered ? '-12px' : '8px'}) scale(${textScale})`,
+          transformOrigin: 'bottom center'
+        }}
       >
-        <div className="bg-black/90 backdrop-blur-md border border-white/10 px-4 py-2 rounded-xl shadow-2xl flex flex-col items-center gap-1">
-            <span className="text-white font-bold text-sm leading-tight">
+        <div className="bg-black/95 backdrop-blur-xl border border-white/10 px-4 py-2.5 rounded-xl shadow-2xl flex flex-col items-center gap-0.5 min-w-[180px]">
+          <span className="text-white font-bold text-sm leading-tight text-center line-clamp-1">
             {vinyl.title}
-            </span>
-            <span className="text-accent text-xs font-medium">
+          </span>
+          <span className="text-accent text-xs font-medium">
             {vinyl.artist}
+          </span>
+          {vinyl.genre?.[0] && (
+            <span className="text-zinc-500 text-[10px] mt-0.5">
+              {vinyl.genre[0]} &middot; {vinyl.year}
             </span>
-            {vinyl.previewUrl && (
-                <div className="text-[10px] text-zinc-400 flex items-center gap-1 mt-1">
-                    <svg className="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                    Previewing
-                </div>
-            )}
+          )}
+          {vinyl.previewUrl && audioUnlocked && (
+            <div className="text-[9px] text-zinc-500 flex items-center gap-1 mt-1">
+              <div className="flex gap-[2px] items-end h-3">
+                <div className="w-[2px] bg-accent h-1 animate-[pulse_0.4s_ease-in-out_infinite]" />
+                <div className="w-[2px] bg-accent h-2 animate-[pulse_0.6s_ease-in-out_infinite]" />
+                <div className="w-[2px] bg-accent h-1.5 animate-[pulse_0.5s_ease-in-out_infinite]" />
+              </div>
+              Previewing
+            </div>
+          )}
         </div>
-        
-        {/* Listener Count Badge */}
+
+        {/* Listener count badge */}
         {vinyl.listenerCount > 0 && (
-           <span className="text-black text-[10px] -mt-2 z-10 font-bold flex items-center gap-1 bg-gold px-2 py-0.5 rounded-full border border-white/50 shadow-lg">
-             {vinyl.listenerCount} listening
-           </span>
+          <span className="text-black text-[9px] font-bold flex items-center gap-1 bg-gold px-2 py-0.5 rounded-full shadow-lg -mt-1.5 z-10">
+            {vinyl.listenerCount > 999 ? `${(vinyl.listenerCount / 1000).toFixed(1)}k` : vinyl.listenerCount} listening
+          </span>
         )}
       </div>
     </div>
