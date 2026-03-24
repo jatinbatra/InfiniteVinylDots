@@ -6,7 +6,7 @@ import Earth, { GLOBE_RADIUS } from './Earth';
 import Atmosphere from './Atmosphere';
 import VinylMarker3D from './VinylMarker3D';
 import { VinylRecord } from '../types';
-import { getSunDirection, latLngToSphere } from '../utils/geoUtils';
+import { getSunDirection } from '../utils/geoUtils';
 
 interface GlobeSceneProps {
   vinyls: VinylRecord[];
@@ -14,45 +14,6 @@ interface GlobeSceneProps {
   audioUnlocked: boolean;
   flyToTarget?: { lat: number; lng: number } | null;
 }
-
-// Connection lines between nearby playing vinyls
-const ConnectionLines: React.FC<{ vinyls: VinylRecord[] }> = ({ vinyls }) => {
-  const linesRef = useRef<THREE.LineSegments>(null);
-
-  const geometry = useMemo(() => {
-    const positions: number[] = [];
-    const playing = vinyls.filter(v => v.isPlaying && v.lat != null && v.lng != null).slice(0, 30);
-
-    for (let i = 0; i < playing.length - 1; i++) {
-      const a = playing[i];
-      const b = playing[i + 1];
-      const posA = latLngToSphere(a.lat!, a.lng!, GLOBE_RADIUS * 1.006);
-      const posB = latLngToSphere(b.lat!, b.lng!, GLOBE_RADIUS * 1.006);
-      positions.push(posA.x, posA.y, posA.z, posB.x, posB.y, posB.z);
-    }
-
-    const geo = new THREE.BufferGeometry();
-    if (positions.length > 0) {
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    }
-    return geo;
-  }, [vinyls]);
-
-  useFrame(() => {
-    if (linesRef.current && linesRef.current.material) {
-      (linesRef.current.material as THREE.LineBasicMaterial).opacity =
-        0.04 + Math.sin(Date.now() * 0.001) * 0.02;
-    }
-  });
-
-  if (geometry.attributes.position === undefined) return null;
-
-  return (
-    <lineSegments ref={linesRef} geometry={geometry}>
-      <lineBasicMaterial color="#00D9FF" transparent opacity={0.05} />
-    </lineSegments>
-  );
-};
 
 // Sun-driven directional light
 const SunLight: React.FC = () => {
@@ -137,8 +98,6 @@ const GlobeContent: React.FC<{
 
       <Earth />
       <Atmosphere sunDirection={sunDir} />
-
-      <ConnectionLines vinyls={vinyls} />
 
       {vinyls.map(vinyl => (
         <VinylMarker3D

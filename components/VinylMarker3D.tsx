@@ -186,7 +186,7 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
     if (!groupRef.current) return;
 
     // Smooth scale animation
-    const targetScale = hovered ? 3.0 : 1;
+    const targetScale = hovered ? 2.0 : 1;
     const s = groupRef.current.scale.x;
     groupRef.current.scale.setScalar(THREE.MathUtils.lerp(s, targetScale, 0.1));
 
@@ -291,66 +291,34 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
         </mesh>
       )}
 
-      {/* Hover tooltip */}
+      {/* Hover tooltip — clean and minimal */}
       {hovered && (
         <Html
-          position={[0, markerSize * 5, 0]}
+          position={[0, markerSize * 4, 0]}
           center
           style={{ pointerEvents: 'none', transform: 'translate(-50%, -100%)' }}
           distanceFactor={3}
         >
-          <div
-            className="bg-black/95 backdrop-blur-xl border border-white/10 px-4 py-3 rounded-xl shadow-2xl flex flex-col items-center gap-1 min-w-[200px] whitespace-nowrap"
-            style={{ animation: 'tooltipIn 0.2s ease-out' }}
-          >
+          <div className="bg-zinc-950/95 backdrop-blur-xl border border-white/[0.08] px-3.5 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 whitespace-nowrap">
             {vinyl.coverUrl && (
               <img
                 src={vinyl.coverUrl}
                 alt=""
-                className="w-14 h-14 rounded-lg object-cover mb-1 shadow-lg border border-white/5"
+                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
               />
             )}
-            <span className="text-white font-bold text-sm leading-tight text-center max-w-[200px] truncate">
-              {vinyl.title}
-            </span>
-            <span className="text-xs font-medium" style={{ color: vinylColor }}>
-              {vinyl.artist}
-            </span>
-            <div className="flex items-center gap-2 mt-0.5">
-              {vinyl.genre?.[0] && (
-                <span className="text-zinc-500 text-[10px]">{vinyl.genre[0]}</span>
-              )}
-              {vinyl.circadianMood && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10"
-                  style={{ color: vinylColor }}>
-                  {vinyl.circadianMood}
-                </span>
-              )}
-            </div>
-            {vinyl.previewUrl && audioUnlocked && (
-              <div className="text-[9px] text-zinc-500 flex items-center gap-1 mt-1">
-                <div className="flex gap-[2px] items-end h-3">
-                  <div className="w-[2px] h-1 rounded-full animate-pulse" style={{ backgroundColor: vinylColor }} />
-                  <div className="w-[2px] h-2 rounded-full animate-pulse" style={{ backgroundColor: vinylColor, animationDelay: '0.1s' }} />
-                  <div className="w-[2px] h-1.5 rounded-full animate-pulse" style={{ backgroundColor: vinylColor, animationDelay: '0.2s' }} />
-                </div>
-                Previewing
+            <div className="min-w-0">
+              <div className="text-white font-semibold text-xs leading-tight truncate max-w-[160px]">
+                {vinyl.title}
               </div>
-            )}
-          </div>
-          {vinyl.listenerCount > 0 && (
-            <div className="flex justify-center -mt-1">
-              <span className="text-black text-[9px] font-bold bg-yellow-400 px-2 py-0.5 rounded-full shadow-lg">
-                {vinyl.listenerCount > 999 ? `${(vinyl.listenerCount / 1000).toFixed(1)}k` : vinyl.listenerCount} listening
-              </span>
+              <div className="text-zinc-500 text-[11px] truncate max-w-[160px]">
+                {vinyl.artist}
+              </div>
+              {vinyl.genre?.[0] && (
+                <div className="text-zinc-600 text-[10px] mt-0.5">{vinyl.genre[0]}</div>
+              )}
             </div>
-          )}
-          <style>{`
-            @keyframes tooltipIn {
-              from { opacity: 0; transform: translate(-50%, -90%) scale(0.9); }
-              to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
-            }
-          `}</style>
+          </div>
         </Html>
       )}
     </group>

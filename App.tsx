@@ -4,8 +4,8 @@ import PlayerModal from './components/PlayerModal';
 import Hud from './components/Hud';
 import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
+import IntroScreen from './components/IntroScreen';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
-
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
 
@@ -15,13 +15,8 @@ const App: React.FC = () => {
   const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
-  const [hoveredRegionInfo, setHoveredRegionInfo] = useState<{
-    name: string;
-    mood: string;
-    emoji: string;
-    color: string;
-    localTime: string;
-  } | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [loadedCityNames, setLoadedCityNames] = useState<string[]>([]);
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
@@ -41,36 +36,57 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Load all city-regions on mount — uses city name as unique key
+  // Load cities — batch 4 concurrent requests for speed
   useEffect(() => {
     const loadAllRegions = async () => {
-      for (let i = 0; i < REGIONS.length; i++) {
-        const r = REGIONS[i];
-        const key = r.name; // unique per city
+      const batchSize = 4;
+      for (let i = 0; i < REGIONS.length; i += batchSize) {
+        const batch = REGIONS.slice(i, i + batchSize);
 
-        if (regionsRef.current[key]) continue;
+        // Mark all in batch as loading
+        setRegions(prev => {
+          const next = { ...prev };
+          for (const r of batch) {
+            if (!next[r.name]) {
+              next[r.name] = { id: r.name, status: 'loading', data: [] };
+            }
+          }
+          return next;
+        });
 
-        setRegions(prev => ({
-          ...prev,
-          [key]: { id: key, status: 'loading', data: [] }
-        }));
+        // Fetch batch concurrently
+        const results = await Promise.allSettled(
+          batch.map(r =>
+            regionsRef.current[r.name]?.status === 'loaded'
+              ? Promise.resolve(null) // skip already loaded
+              : fetchRegionalTracks(r.code, r.lat, r.lng, r.name)
+          )
+        );
 
-        try {
-          const vinyls = await fetchRegionalTracks(r.code, r.lat, r.lng, r.name);
-          setRegions(prev => ({
-            ...prev,
-            [key]: { id: key, status: 'loaded', data: vinyls }
-          }));
-        } catch {
-          setRegions(prev => ({
-            ...prev,
-            [key]: { id: key, status: 'error', data: [] }
-          }));
+        setRegions(prev => {
+          const next = { ...prev };
+          results.forEach((result, idx) => {
+            const r = batch[idx];
+            if (result.status === 'fulfilled' && result.value) {
+              next[r.name] = { id: r.name, status: 'loaded', data: result.value };
+            } else if (result.status === 'rejected') {
+              next[r.name] = { id: r.name, status: 'error', data: [] };
+            }
+          });
+          return next;
+        });
+
+        // Track loaded city names for the intro screen
+        const newNames = batch
+          .filter((_, idx) => results[idx].status === 'fulfilled' && (results[idx] as PromiseFulfilledResult<any>).value)
+          .map(r => r.name);
+        if (newNames.length > 0) {
+          setLoadedCityNames(prev => [...prev, ...newNames]);
         }
 
-        // Small delay between requests to be nice to the API
-        if (i < REGIONS.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+        // Brief pause between batches to avoid rate-limiting
+        if (i + batchSize < REGIONS.length) {
+          await new Promise(resolve => setTimeout(resolve, 150));
         }
       }
     };
@@ -128,7 +144,7 @@ const App: React.FC = () => {
     if (data.searchTerm) {
       const tracks = await fetchTrackSearch(data.searchTerm);
       if (tracks.length > 0) {
-        newVinyl = { ...tracks[0], lat: 40, lng: -74, isOwner: true }; // Default to NYC
+        newVinyl = { ...tracks[0], lat: 40, lng: -74, isOwner: true };
       } else {
         return;
       }
@@ -169,7 +185,7 @@ const App: React.FC = () => {
     setSelectedVinyl(newVinyl);
   };
 
-  // Circadian refresh: periodically refresh a random city with fresh regional music
+  // Circadian refresh
   useEffect(() => {
     const interval = setInterval(() => {
       const loadedKeys = Object.keys(regionsRef.current).filter(
@@ -181,7 +197,6 @@ const App: React.FC = () => {
       const region = REGIONS.find(r => r.name === randomKey);
       if (!region) return;
 
-      // Re-fetch with a fresh regional genre
       fetchRegionalTracks(region.code, region.lat, region.lng, region.name)
         .then(newVinyls => {
           if (newVinyls.length === 0) return;
@@ -198,7 +213,6 @@ const App: React.FC = () => {
 
   const handleFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToTarget({ lat, lng });
-    // Clear after animation has time to complete
     setTimeout(() => setFlyToTarget(null), 3000);
   }, []);
 
@@ -206,7 +220,16 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full font-sans text-white">
-      {/* 3D Globe */}
+      {/* Intro / Loading Screen */}
+      {showIntro && (
+        <IntroScreen
+          loadedCities={loadedCityNames}
+          totalCities={REGIONS.length}
+          onEnter={() => setShowIntro(false)}
+        />
+      )}
+
+      {/* 3D Globe — renders behind intro for instant reveal */}
       <GlobeScene
         vinyls={allVinyls}
         onVinylClick={handleVinylClick}
@@ -214,32 +237,34 @@ const App: React.FC = () => {
         flyToTarget={flyToTarget}
       />
 
-      {/* Search */}
-      <SearchBar onFlyTo={handleFlyTo} />
+      {/* UI — only show after intro dismissed */}
+      {!showIntro && (
+        <>
+          <SearchBar onFlyTo={handleFlyTo} />
 
-      {/* HUD Overlay */}
-      <Hud
-        onDropVinyl={() => setIsDropModalOpen(true)}
-        myVinyl={myVinyl}
-        vinylCount={allVinyls.length}
-        regionCount={loadedRegionCount}
-        totalRegions={REGIONS.length}
-      />
+          <Hud
+            onDropVinyl={() => setIsDropModalOpen(true)}
+            myVinyl={myVinyl}
+            vinylCount={allVinyls.length}
+            regionCount={loadedRegionCount}
+            totalRegions={REGIONS.length}
+          />
 
-      {/* Modals */}
-      {selectedVinyl && (
-        <PlayerModal
-          vinyl={selectedVinyl}
-          onClose={handleCloseModal}
-          onUpdate={handleVinylUpdate}
-        />
-      )}
+          {selectedVinyl && (
+            <PlayerModal
+              vinyl={selectedVinyl}
+              onClose={handleCloseModal}
+              onUpdate={handleVinylUpdate}
+            />
+          )}
 
-      {isDropModalOpen && (
-        <DropModal
-          onClose={() => setIsDropModalOpen(false)}
-          onSubmit={handleDropSubmit}
-        />
+          {isDropModalOpen && (
+            <DropModal
+              onClose={() => setIsDropModalOpen(false)}
+              onSubmit={handleDropSubmit}
+            />
+          )}
+        </>
       )}
     </div>
   );
