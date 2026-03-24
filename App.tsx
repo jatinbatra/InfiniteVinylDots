@@ -3,6 +3,7 @@ import GlobeScene from './components/GlobeScene';
 import PlayerModal from './components/PlayerModal';
 import Hud from './components/Hud';
 import DropModal from './components/DropModal';
+import SearchBar from './components/SearchBar';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
 import { getCircadianMood, getCircadianSearchTerm } from './services/circadianService';
 import { VinylRecord, Chunk } from './types';
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   const [selectedVinyl, setSelectedVinyl] = useState<VinylRecord | null>(null);
   const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
   const [hoveredRegionInfo, setHoveredRegionInfo] = useState<{
     name: string;
     mood: string;
@@ -230,6 +232,12 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const handleFlyTo = useCallback((lat: number, lng: number) => {
+    setFlyToTarget({ lat, lng });
+    // Clear after animation has time to complete
+    setTimeout(() => setFlyToTarget(null), 3000);
+  }, []);
+
   const myVinyl = allVinyls.find(v => v.isOwner);
 
   return (
@@ -239,7 +247,11 @@ const App: React.FC = () => {
         vinyls={allVinyls}
         onVinylClick={handleVinylClick}
         audioUnlocked={audioUnlocked}
+        flyToTarget={flyToTarget}
       />
+
+      {/* Search */}
+      <SearchBar onFlyTo={handleFlyTo} />
 
       {/* HUD Overlay */}
       <Hud
