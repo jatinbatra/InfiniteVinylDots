@@ -71,7 +71,7 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
     onClick(vinyl);
   }, [vinyl, onClick]);
 
-  const markerSize = vinyl.isOwner ? 0.025 : 0.015;
+  const markerSize = vinyl.isOwner ? 0.045 : 0.03;
 
   return (
     <group position={position}>
