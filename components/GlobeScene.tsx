@@ -1,5 +1,5 @@
-import React, { useRef, useMemo, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useRef, useMemo, useEffect, Suspense } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import Earth, { GLOBE_RADIUS } from './Earth';
@@ -12,6 +12,7 @@ interface GlobeSceneProps {
   vinyls: VinylRecord[];
   onVinylClick: (vinyl: VinylRecord) => void;
   audioUnlocked: boolean;
+  flyToTarget?: { lat: number; lng: number } | null;
 }
 
 // Connection lines between nearby playing vinyls
@@ -72,16 +73,57 @@ const SunLight: React.FC = () => {
   );
 };
 
+// Smoothly animate camera to a target lat/lng on the globe
+const FlyToController: React.FC<{ target: { lat: number; lng: number } | null }> = ({ target }) => {
+  const { camera } = useThree();
+  const targetPos = useRef<THREE.Vector3 | null>(null);
+  const isAnimating = useRef(false);
+
+  useEffect(() => {
+    if (target) {
+      // Compute target camera position: on the globe surface normal, at a viewing distance
+      const surfacePoint = latLngToSphere(target.lat, target.lng, GLOBE_RADIUS);
+      const direction = surfacePoint.clone().normalize();
+      const cameraDistance = GLOBE_RADIUS * 2.8;
+      targetPos.current = direction.multiplyScalar(cameraDistance);
+      isAnimating.current = true;
+    }
+  }, [target]);
+
+  useFrame(() => {
+    if (!isAnimating.current || !targetPos.current) return;
+
+    const current = camera.position.clone();
+    const dest = targetPos.current;
+
+    // Lerp camera position toward target
+    camera.position.lerp(dest, 0.04);
+    camera.lookAt(0, 0, 0);
+
+    // Stop animating when close enough
+    if (current.distanceTo(dest) < 0.01) {
+      camera.position.copy(dest);
+      camera.lookAt(0, 0, 0);
+      isAnimating.current = false;
+      targetPos.current = null;
+    }
+  });
+
+  return null;
+};
+
 const GlobeContent: React.FC<{
   vinyls: VinylRecord[];
   onVinylClick: (vinyl: VinylRecord) => void;
   audioUnlocked: boolean;
-}> = ({ vinyls, onVinylClick, audioUnlocked }) => {
+  flyToTarget?: { lat: number; lng: number } | null;
+}> = ({ vinyls, onVinylClick, audioUnlocked, flyToTarget }) => {
   const sunDir = useMemo(() => getSunDirection(), []);
 
   return (
     <>
       <SunLight />
+      <FlyToController target={flyToTarget ?? null} />
 
       <Stars
         radius={100}
@@ -122,7 +164,7 @@ const GlobeContent: React.FC<{
   );
 };
 
-const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, onVinylClick, audioUnlocked }) => {
+const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, onVinylClick, audioUnlocked, flyToTarget }) => {
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000005' }}>
       <Canvas
@@ -145,6 +187,7 @@ const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, onVinylClick, audioUnlo
             vinyls={vinyls}
             onVinylClick={onVinylClick}
             audioUnlocked={audioUnlocked}
+            flyToTarget={flyToTarget}
           />
         </Suspense>
       </Canvas>
