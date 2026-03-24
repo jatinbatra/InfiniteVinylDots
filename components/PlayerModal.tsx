@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { VinylRecord, AlbumInsight } from '../types';
 import { getAlbumInsight } from '../services/geminiService';
 import { audioManager } from '../services/musicService';
+import { searchYouTubeVideo } from '../services/youtubeService';
 
 interface PlayerModalProps {
   vinyl: VinylRecord | null;
@@ -9,26 +10,13 @@ interface PlayerModalProps {
   onUpdate: (vinyl: VinylRecord) => void;
 }
 
-const YouTubePlayer: React.FC<{ videoId: string }> = ({ videoId }) => (
-  <div className="w-full h-full bg-black rounded-xl overflow-hidden shadow-2xl">
-    <iframe
-      width="100%"
-      height="100%"
-      src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
-      title="YouTube video player"
-      frameBorder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      referrerPolicy="strict-origin-when-cross-origin"
-      allowFullScreen
-      className="w-full h-full"
-    />
-  </div>
-);
-
 const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) => {
   const [insight, setInsight] = useState<AlbumInsight | null>(null);
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [youtubeId, setYoutubeId] = useState<string | null>(null);
+  const [isSearchingYT, setIsSearchingYT] = useState(false);
+  const [showYouTube, setShowYouTube] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -39,14 +27,27 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
 
     setInsight(null);
     setIsLoadingInsight(true);
+    setYoutubeId(null);
+    setShowYouTube(false);
 
     getAlbumInsight(vinyl.artist, vinyl.title).then(data => {
       setInsight(data);
       setIsLoadingInsight(false);
     });
 
-    // For iTunes tracks, start playback
-    if (vinyl.sourceType !== 'youtube' && vinyl.sourceType !== 'spotify' && vinyl.previewUrl) {
+    // Search YouTube for full song
+    if (vinyl.sourceType === 'youtube' && vinyl.externalId) {
+      setYoutubeId(vinyl.externalId);
+    } else {
+      setIsSearchingYT(true);
+      searchYouTubeVideo(vinyl.artist, vinyl.title).then(id => {
+        setYoutubeId(id);
+        setIsSearchingYT(false);
+      });
+    }
+
+    // Start iTunes preview for background while YT loads
+    if (vinyl.previewUrl && vinyl.sourceType !== 'youtube' && vinyl.sourceType !== 'spotify') {
       setIsPlaying(true);
     } else {
       setIsPlaying(false);
@@ -57,13 +58,12 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
-    if (isPlaying) {
+    if (isPlaying && !showYouTube) {
       audio.play().catch(() => setIsPlaying(false));
     } else {
       audio.pause();
     }
-  }, [isPlaying]);
+  }, [isPlaying, showYouTube]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -86,8 +86,6 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
 
   if (!vinyl) return null;
 
-  const isExternal = vinyl.sourceType === 'youtube' || vinyl.sourceType === 'spotify';
-
   const handleJoinToggle = () => {
     onUpdate({
       ...vinyl,
@@ -108,6 +106,12 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
     onUpdate({ ...vinyl, isFollowed: !vinyl.isFollowed });
   };
 
+  const handlePlayFull = () => {
+    setShowYouTube(true);
+    setIsPlaying(false); // Stop preview
+    if (audioRef.current) audioRef.current.pause();
+  };
+
   const listenerAvatars = [
     vinyl.ownerAvatar,
     `https://i.pravatar.cc/150?u=${vinyl.id}1`,
@@ -118,7 +122,7 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
       {/* Audio element for iTunes preview */}
-      {!isExternal && vinyl.previewUrl && (
+      {vinyl.previewUrl && (
         <audio ref={audioRef} src={vinyl.previewUrl} loop />
       )}
 
@@ -144,22 +148,32 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
 
         {/* Visual Side */}
         <div className="md:w-1/2 relative bg-zinc-900 flex items-center justify-center p-6 md:p-10 overflow-hidden min-h-[300px]">
-          {isExternal ? (
+          {showYouTube && youtubeId ? (
+            /* YouTube full song player */
+            <div className="w-full aspect-video z-10 rounded-xl overflow-hidden shadow-2xl">
+              <iframe
+                width="100%"
+                height="100%"
+                src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`}
+                title="YouTube video player"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+          ) : vinyl.sourceType === 'spotify' && vinyl.externalId ? (
             <div className="w-full aspect-square z-10">
-              {vinyl.sourceType === 'youtube' && vinyl.externalId && (
-                <YouTubePlayer videoId={vinyl.externalId} />
-              )}
-              {vinyl.sourceType === 'spotify' && vinyl.externalId && (
-                <iframe
-                  style={{ borderRadius: '12px' }}
-                  src={`https://open.spotify.com/embed/track/${vinyl.externalId}?utm_source=generator&theme=0`}
-                  width="100%"
-                  height="100%"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  loading="lazy"
-                  className="shadow-2xl"
-                />
-              )}
+              <iframe
+                style={{ borderRadius: '12px' }}
+                src={`https://open.spotify.com/embed/track/${vinyl.externalId}?utm_source=generator&theme=0`}
+                width="100%"
+                height="100%"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                className="shadow-2xl"
+              />
             </div>
           ) : (
             <>
@@ -189,29 +203,54 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
                 </div>
               </div>
 
-              {/* Play/pause indicator */}
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm border border-white/10 rounded-full px-5 py-2 flex items-center gap-2 hover:bg-black/80 transition-colors"
-              >
-                {isPlaying ? (
-                  <>
-                    <div className="flex gap-[3px] items-end h-4">
-                      <div className="w-[3px] bg-accent rounded-full h-2 animate-[pulse_0.4s_ease-in-out_infinite]" />
-                      <div className="w-[3px] bg-accent rounded-full h-4 animate-[pulse_0.6s_ease-in-out_infinite]" />
-                      <div className="w-[3px] bg-accent rounded-full h-3 animate-[pulse_0.5s_ease-in-out_infinite]" />
-                    </div>
-                    <span className="text-xs text-white font-medium">Playing Preview</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              {/* Controls */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                {/* Preview play/pause */}
+                {vinyl.previewUrl && (
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2 flex items-center gap-2 hover:bg-black/80 transition-colors"
+                  >
+                    {isPlaying ? (
+                      <>
+                        <div className="flex gap-[3px] items-end h-4">
+                          <div className="w-[3px] bg-accent rounded-full h-2 animate-[pulse_0.4s_ease-in-out_infinite]" />
+                          <div className="w-[3px] bg-accent rounded-full h-4 animate-[pulse_0.6s_ease-in-out_infinite]" />
+                          <div className="w-[3px] bg-accent rounded-full h-3 animate-[pulse_0.5s_ease-in-out_infinite]" />
+                        </div>
+                        <span className="text-[10px] text-white font-medium">Preview</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                        <span className="text-[10px] text-white font-medium">Preview</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Full song button */}
+                {youtubeId && !showYouTube && (
+                  <button
+                    onClick={handlePlayFull}
+                    className="bg-red-600/90 hover:bg-red-600 backdrop-blur-sm border border-red-500/30 rounded-full px-4 py-2 flex items-center gap-2 transition-colors shadow-lg shadow-red-900/20"
+                  >
+                    <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    <span className="text-xs text-white font-medium">Play Preview</span>
-                  </>
+                    <span className="text-[10px] text-white font-bold">Full Song</span>
+                  </button>
                 )}
-              </button>
+
+                {isSearchingYT && (
+                  <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2 flex items-center gap-2">
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="text-[10px] text-zinc-400 font-medium">Finding full song...</span>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -230,6 +269,11 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
                 {vinyl.sourceType && (
                   <span className="text-[9px] uppercase tracking-wider text-gold border border-gold/20 bg-gold/5 px-2 py-0.5 rounded-full">
                     {vinyl.sourceType}
+                  </span>
+                )}
+                {showYouTube && (
+                  <span className="text-[9px] uppercase tracking-wider text-red-400 border border-red-500/20 bg-red-500/5 px-2 py-0.5 rounded-full">
+                    Full Song via YouTube
                   </span>
                 )}
               </div>
@@ -299,6 +343,33 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
                 <p className="text-zinc-600 text-xs">Insight unavailable</p>
               )}
             </div>
+
+            {/* YouTube switch — if watching preview, offer full song */}
+            {youtubeId && !showYouTube && (
+              <button
+                onClick={handlePlayFull}
+                className="w-full bg-gradient-to-r from-red-600/20 to-red-900/20 border border-red-500/20 rounded-xl p-3 flex items-center gap-3 hover:border-red-500/40 transition-colors group"
+              >
+                <div className="bg-red-600 rounded-full p-2 group-hover:scale-110 transition-transform">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="text-white text-sm font-bold">Play Full Song</div>
+                  <div className="text-zinc-500 text-[10px]">Stream via YouTube — no limits</div>
+                </div>
+              </button>
+            )}
+
+            {showYouTube && (
+              <button
+                onClick={() => { setShowYouTube(false); setIsPlaying(!!vinyl.previewUrl); }}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                &larr; Back to vinyl view
+              </button>
+            )}
           </div>
 
           {/* Bottom: Listening Room */}
@@ -332,9 +403,9 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
               </button>
             </div>
 
-            {isExternal && (
+            {showYouTube && (
               <p className="text-center text-[9px] text-zinc-600 uppercase tracking-[0.15em]">
-                Interactive Player Active
+                Full Song Playing via YouTube
               </p>
             )}
           </div>
