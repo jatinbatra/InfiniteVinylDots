@@ -46,18 +46,56 @@ const BORDERS: number[][] = [
   // US-Mexico border
   [-117,33,-112,31], [-112,31,-108,31], [-108,31,-105,30], [-105,30,-100,28],
   [-100,28,-97,26],
-  // Brazil borders
+  // Brazil borders (N/NW/S)
   [-58,-34,-55,-23], [-55,-23,-48,-5], [-48,-5,-35,-5],
+  [-70,-10,-65,-15], [-65,-15,-58,-20], [-58,-20,-55,-23],
+  [-80,0,-75,-2], [-75,-2,-74,-5], [-74,-5,-70,-10],
+  // Argentina-Chile border (Andes)
+  [-70,-18,-70,-25], [-70,-25,-70,-35], [-70,-35,-72,-42], [-72,-42,-72,-52],
   // India borders
-  [68,24,77,35], [77,35,88,28], [88,28,92,22], [78,8,80,12],
-  // China borders (south)
+  [68,24,72,28], [72,28,77,35], [77,35,82,30], [82,30,88,28], [88,28,92,22],
+  [78,8,80,12], [80,12,78,15],
+  // China borders (south + west)
   [105,22,110,18], [98,22,105,22], [88,28,98,22],
+  [78,35,82,38], [82,38,88,40], [88,40,95,42], [95,42,100,40],
+  [100,40,105,42], [105,42,110,45], [110,45,120,48], [120,48,125,45],
+  // China-Mongolia border
+  [88,42,95,47], [95,47,105,48], [105,48,115,48], [115,48,120,48],
   // Russia-Europe border (Urals approximation)
   [60,50,60,55], [60,55,60,60], [60,60,60,65], [60,65,60,70],
+  // Russia western border
+  [28,70,28,65], [28,65,26,60], [26,60,24,56], [24,56,22,52],
+  [22,52,24,50], [24,50,26,48], [26,48,28,46],
+  // Europe: France-Germany (Rhine)
+  [6,47,7,48], [7,48,8,49], [8,49,8,50], [8,50,7,51],
+  // Europe: France-Spain (Pyrenees)
+  [-2,43,0,43], [0,43,2,43], [2,43,3,43],
+  // Europe: Germany-Poland
+  [12,54,14,53], [14,53,15,52], [15,52,15,51],
+  // Europe: Italy approximate
+  [7,44,8,44], [8,44,12,42], [12,42,14,42], [14,42,16,40],
+  // Scandinavia: Sweden-Norway
+  [12,58,14,60], [14,60,16,63], [16,63,18,67], [18,67,20,69],
+  // Scandinavia: Sweden-Finland
+  [20,60,22,62], [22,62,25,65], [25,65,28,68],
   // Middle East
-  [35,30,40,20], [40,20,45,30], [45,30,50,25],
+  [35,30,38,25], [38,25,40,20], [40,20,44,28], [44,28,48,30],
+  [48,30,50,27], [50,27,52,25],
+  // Iran borders
+  [44,38,48,38], [48,38,52,36], [52,36,56,32], [56,32,60,28],
   // Central Africa
   [10,5,10,0], [10,0,15,-5], [15,-5,25,-5], [25,-5,30,0], [30,0,30,5],
+  // Egypt-Libya-Sudan
+  [25,32,25,22], [22,22,32,22], [32,22,35,22],
+  // Nigeria region
+  [3,14,15,14], [3,6,3,14], [15,6,15,14],
+  // South Africa borders
+  [18,-34,20,-30], [20,-30,25,-28], [25,-28,32,-28],
+  // East Africa
+  [30,0,35,0], [35,0,35,-5], [35,-5,30,-5], [30,-5,30,0],
+  // Australia state borders
+  [129,-14,129,-26], [129,-26,138,-26], [138,-26,138,-38],
+  [141,-26,141,-38], [150,-29,141,-29],
 ];
 
 // Country labels [lng, lat, label, fontSize]
@@ -104,34 +142,64 @@ const COUNTRY_LABELS: [number, number, string, number][] = [
   [121, 15, 'PHL', 10],
 ];
 
-// Ocean labels [lng, lat, label]
-const OCEAN_LABELS: [number, number, string][] = [
-  [-150, 10, 'PACIFIC OCEAN'],
-  [-30, 10, 'ATLANTIC OCEAN'],
-  [75, -20, 'INDIAN OCEAN'],
-  [-160, -40, 'SOUTH PACIFIC'],
-  [0, -60, 'SOUTHERN OCEAN'],
-  [0, 78, 'ARCTIC OCEAN'],
+// Ocean labels [lng, lat, label, fontSize]
+const OCEAN_LABELS: [number, number, string, number][] = [
+  [-150, 5, 'PACIFIC', 26],
+  [-150, -15, 'OCEAN', 20],
+  [170, 15, 'PACIFIC', 22],
+  [-30, 20, 'ATLANTIC', 22],
+  [-30, 5, 'OCEAN', 18],
+  [75, -15, 'INDIAN', 22],
+  [75, -30, 'OCEAN', 18],
+  [-160, -40, 'SOUTH PACIFIC', 16],
+  [0, -62, 'SOUTHERN OCEAN', 16],
+  [0, 80, 'ARCTIC OCEAN', 14],
 ];
 
 // Cities [lng, lat, name]
 const CITIES: [number, number, string][] = [
+  // North America
   [-74, 40.7, 'New York'], [-118, 34, 'Los Angeles'], [-87, 41.9, 'Chicago'],
   [-122, 37.8, 'San Francisco'], [-80, 25.8, 'Miami'], [-95.4, 29.8, 'Houston'],
+  [-77, 38.9, 'Washington'], [-79.4, 43.7, 'Toronto'], [-73.6, 45.5, 'Montreal'],
+  [-123.1, 49.3, 'Vancouver'], [-104.9, 39.7, 'Denver'], [-84.4, 33.7, 'Atlanta'],
+  [-122.3, 47.6, 'Seattle'], [-71, 42.4, 'Boston'], [-93.3, 45, 'Minneapolis'],
+  [-112, 33.4, 'Phoenix'], [-90, 30, 'New Orleans'],
+  [-99.1, 19.4, 'Mexico City'], [-96.8, 17, 'Oaxaca'],
+  // Europe
   [-0.1, 51.5, 'London'], [2.3, 48.9, 'Paris'], [13.4, 52.5, 'Berlin'],
   [-3.7, 40.4, 'Madrid'], [12.5, 41.9, 'Rome'], [23.7, 37.9, 'Athens'],
+  [14.4, 50.1, 'Prague'], [21, 52.2, 'Warsaw'], [18.1, 59.3, 'Stockholm'],
+  [24.9, 60.2, 'Helsinki'], [10.8, 59.9, 'Oslo'], [16.4, 48.2, 'Vienna'],
+  [19.1, 47.5, 'Budapest'], [4.9, 52.4, 'Amsterdam'], [-9.1, 38.7, 'Lisbon'],
+  [26.1, 44.4, 'Bucharest'], [12.6, 55.7, 'Copenhagen'], [6.1, 46.2, 'Geneva'],
+  [-6.3, 53.3, 'Dublin'], [11.6, 48.1, 'Munich'], [9.2, 45.5, 'Milan'],
+  // Asia
   [139.7, 35.7, 'Tokyo'], [126.9, 37.5, 'Seoul'], [121.5, 31.2, 'Shanghai'],
   [116.4, 39.9, 'Beijing'], [114.2, 22.3, 'Hong Kong'], [103.8, 1.3, 'Singapore'],
-  [100.5, 13.8, 'Bangkok'], [106.8, -6.2, 'Jakarta'],
+  [100.5, 13.8, 'Bangkok'], [106.8, -6.2, 'Jakarta'], [135.5, 34.7, 'Osaka'],
+  [113, 23.1, 'Guangzhou'], [104.1, 30.6, 'Chengdu'], [106.7, 10.8, 'Ho Chi Minh'],
+  [120.9, 14.6, 'Manila'], [96.2, 16.9, 'Yangon'],
+  [77.2, 28.6, 'Delhi'], [72.9, 19.1, 'Mumbai'], [88.4, 22.6, 'Kolkata'],
+  [77.6, 13, 'Bangalore'], [80.3, 13.1, 'Chennai'],
+  [55.3, 25.3, 'Dubai'], [44.4, 33.3, 'Baghdad'], [51.4, 35.7, 'Tehran'],
+  [46.7, 24.7, 'Riyadh'], [67, 24.9, 'Karachi'], [69.2, 34.5, 'Kabul'],
+  [37.6, 55.8, 'Moscow'], [30.3, 59.9, 'St Petersburg'],
+  [28.9, 41, 'Istanbul'], [68.8, 38.6, 'Tashkent'], [76.9, 43.2, 'Almaty'],
+  [73.9, 18.5, 'Pune'],
+  // Africa
+  [31, 30, 'Cairo'], [36.8, -1.3, 'Nairobi'], [3.4, 6.5, 'Lagos'],
+  [18.4, -33.9, 'Cape Town'], [28, -26.2, 'Johannesburg'],
+  [-7.6, 33.6, 'Casablanca'], [2.1, 36.8, 'Algiers'], [13.2, 32.9, 'Tripoli'],
+  [38.7, 9, 'Addis Ababa'], [32.6, 0.3, 'Kampala'], [7.5, 9, 'Abuja'],
+  [47.5, -18.9, 'Antananarivo'], [36.3, -6.8, 'Dar es Salaam'],
+  // South America
   [-46.6, -23.5, 'São Paulo'], [-43.2, -22.9, 'Rio'], [-58.4, -34.6, 'Buenos Aires'],
   [-70.7, -33.4, 'Santiago'], [-77, -12, 'Lima'], [-74, 4.6, 'Bogotá'],
-  [-99.1, 19.4, 'Mexico City'],
-  [77.2, 28.6, 'Delhi'], [72.9, 19.1, 'Mumbai'], [88.4, 22.6, 'Kolkata'],
-  [55.3, 25.3, 'Dubai'], [44.4, 33.3, 'Baghdad'], [51.4, 35.7, 'Tehran'],
-  [37.6, 55.8, 'Moscow'], [30.3, 59.9, 'St Petersburg'],
-  [28.9, 41, 'Istanbul'], [31, 30, 'Cairo'], [36.8, -1.3, 'Nairobi'],
-  [3.4, 6.5, 'Lagos'], [18.4, -33.9, 'Cape Town'], [28, -26.2, 'Johannesburg'],
+  [-66.9, 10.5, 'Caracas'], [-57.6, -25.3, 'Asunción'], [-56.2, -34.9, 'Montevideo'],
+  // Oceania
   [151.2, -33.9, 'Sydney'], [144.9, -37.8, 'Melbourne'], [174.8, -41.3, 'Wellington'],
+  [153, -27.5, 'Brisbane'], [115.9, -32, 'Perth'],
 ];
 
 export function generateEarthTexture(width = 2048, height = 1024): HTMLCanvasElement {
@@ -178,7 +246,7 @@ export function generateEarthTexture(width = 2048, height = 1024): HTMLCanvasEle
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(0, 200, 255, 0.10)';
+    ctx.fillStyle = 'rgba(0, 200, 255, 0.12)';
     ctx.fill();
   }
 
@@ -189,8 +257,8 @@ export function generateEarthTexture(width = 2048, height = 1024): HTMLCanvasEle
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
     ctx.closePath();
-    ctx.strokeStyle = 'rgba(0, 220, 255, 0.12)';
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgba(0, 220, 255, 0.18)';
+    ctx.lineWidth = 7;
     ctx.stroke();
   }
 
@@ -201,8 +269,8 @@ export function generateEarthTexture(width = 2048, height = 1024): HTMLCanvasEle
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
     ctx.closePath();
-    ctx.strokeStyle = 'rgba(0, 230, 255, 0.6)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0, 230, 255, 0.7)';
+    ctx.lineWidth = 2;
     ctx.stroke();
   }
 
@@ -221,20 +289,28 @@ export function generateEarthTexture(width = 2048, height = 1024): HTMLCanvasEle
   // Ocean labels
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (const [lng, lat, label] of OCEAN_LABELS) {
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillStyle = 'rgba(0, 120, 180, 0.12)';
-    ctx.letterSpacing = '8px';
+  for (const [lng, lat, label, fontSize] of OCEAN_LABELS) {
+    const scaledSize = Math.round(fontSize * (width / 2048));
+    ctx.font = `${scaledSize}px sans-serif`;
+    ctx.fillStyle = 'rgba(0, 100, 180, 0.08)';
+    ctx.letterSpacing = '6px';
+    ctx.fillText(label, toX(lng) + 1, toY(lat) + 1);
+    ctx.fillStyle = 'rgba(0, 140, 220, 0.18)';
     ctx.fillText(label, toX(lng), toY(lat));
     ctx.letterSpacing = '0px';
   }
 
   // Country labels
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   for (const [lng, lat, label, fontSize] of COUNTRY_LABELS) {
-    ctx.font = `bold ${fontSize}px sans-serif`;
-    ctx.fillStyle = 'rgba(0, 210, 255, 0.22)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    const scaledSize = Math.round(fontSize * (width / 2048));
+    ctx.font = `bold ${scaledSize}px "Courier New", monospace`;
+    // Glow behind text
+    ctx.fillStyle = 'rgba(0, 180, 255, 0.1)';
+    ctx.fillText(label, toX(lng) + 1, toY(lat) + 1);
+    // Main text
+    ctx.fillStyle = 'rgba(0, 220, 255, 0.35)';
     ctx.fillText(label, toX(lng), toY(lat));
   }
 
