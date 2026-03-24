@@ -187,7 +187,7 @@ const App: React.FC = () => {
       const searchTerm = getCircadianSearchTerm(region.lng);
       const mood = getCircadianMood(region.lng);
 
-      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${randomKey}&entity=song&limit=25`)
+      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${randomKey}&entity=song&limit=50`)
         .then(res => res.json())
         .then(data => {
           if (!data.results || data.results.length === 0) return;
@@ -227,7 +227,7 @@ const App: React.FC = () => {
           }));
         })
         .catch(() => {});
-    }, 45000); // Refresh every 45 seconds
+    }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
   }, []);

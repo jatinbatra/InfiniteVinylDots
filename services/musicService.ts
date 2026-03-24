@@ -103,7 +103,7 @@ export const fetchRegionalTracks = async (
     const mood = getCircadianMood(centerLng);
 
     const response = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=25`
+      `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=50`
     );
     const data: any = await response.json();
     if (!data.results) return [];
