@@ -3,10 +3,30 @@ import { getCircadianMood } from './circadianService';
 import { REGIONAL_GENRES } from '../constants';
 
 // --- Audio Manager for smooth playback ---
+type AudioListener = (playing: boolean, url: string | null) => void;
+
 class AudioManager {
   private currentAudio: HTMLAudioElement | null = null;
   private currentUrl: string | null = null;
   private fadeInterval: any = null;
+  private listeners: AudioListener[] = [];
+
+  get isPlaying(): boolean {
+    return !!this.currentAudio && !this.currentAudio.paused;
+  }
+
+  get url(): string | null {
+    return this.currentUrl;
+  }
+
+  onStateChange(fn: AudioListener) {
+    this.listeners.push(fn);
+    return () => { this.listeners = this.listeners.filter(l => l !== fn); };
+  }
+
+  private notify() {
+    this.listeners.forEach(fn => fn(this.isPlaying, this.currentUrl));
+  }
 
   play(url: string) {
     if (this.currentUrl === url && this.currentAudio && !this.currentAudio.paused) return;
@@ -20,7 +40,7 @@ class AudioManager {
     const playPromise = this.currentAudio.play();
     if (playPromise !== undefined) {
       playPromise
-        .then(() => this.fadeIn())
+        .then(() => { this.fadeIn(); this.notify(); })
         .catch(error => console.warn("Audio play blocked:", error));
     }
   }
@@ -31,6 +51,7 @@ class AudioManager {
       this.currentAudio = null;
       this.currentUrl = null;
       this.fadeOut(audioToFade);
+      this.notify();
     }
   }
 

@@ -5,6 +5,8 @@ import Hud from './components/Hud';
 import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
 import IntroScreen from './components/IntroScreen';
+import NowPlayingBar from './components/NowPlayingBar';
+import ActivityTicker from './components/ActivityTicker';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
@@ -235,6 +237,7 @@ const App: React.FC = () => {
         onVinylClick={handleVinylClick}
         audioUnlocked={audioUnlocked}
         flyToTarget={flyToTarget}
+        introActive={showIntro}
       />
 
       {/* UI — only show after intro dismissed */}
@@ -249,6 +252,9 @@ const App: React.FC = () => {
             regionCount={loadedRegionCount}
             totalRegions={REGIONS.length}
           />
+
+          <NowPlayingBar vinyls={allVinyls} />
+          <ActivityTicker vinyls={allVinyls} />
 
           {selectedVinyl && (
             <PlayerModal
