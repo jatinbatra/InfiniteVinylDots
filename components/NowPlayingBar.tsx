@@ -6,29 +6,27 @@ interface NowPlayingBarProps {
   vinyls: VinylRecord[];
 }
 
-/**
- * Persistent bottom bar that shows when an audio preview is playing.
- * Displays album art, track info, and animated equalizer bars.
- */
 const NowPlayingBar: React.FC<NowPlayingBarProps> = ({ vinyls }) => {
   const [currentTrack, setCurrentTrack] = useState<VinylRecord | null>(null);
   const [visible, setVisible] = useState(false);
+  const vinylsRef = useRef(vinyls);
+  vinylsRef.current = vinyls;
 
+  // Subscribe once, use ref for latest vinyls
   useEffect(() => {
     const unsub = audioManager.onStateChange((playing, url) => {
       if (playing && url) {
-        const match = vinyls.find(v => v.previewUrl === url);
+        const match = vinylsRef.current.find(v => v.previewUrl === url);
         if (match) {
           setCurrentTrack(match);
           setVisible(true);
         }
       } else {
-        // Delay hide for smooth transition
-        setTimeout(() => setVisible(false), 300);
+        setVisible(false);
       }
     });
     return unsub;
-  }, [vinyls]);
+  }, []);
 
   if (!currentTrack) return null;
 
@@ -45,7 +43,6 @@ const NowPlayingBar: React.FC<NowPlayingBarProps> = ({ vinyls }) => {
           className="bg-black/80 backdrop-blur-2xl border border-white/[0.08] rounded-2xl px-4 py-3 flex items-center gap-3 shadow-2xl"
           style={{ boxShadow: `0 -4px 40px ${color}15` }}
         >
-          {/* Album art */}
           {currentTrack.coverUrl && (
             <div className="relative flex-shrink-0">
               <img
@@ -53,7 +50,6 @@ const NowPlayingBar: React.FC<NowPlayingBarProps> = ({ vinyls }) => {
                 alt=""
                 className="w-11 h-11 rounded-lg object-cover shadow-lg"
               />
-              {/* Spinning overlay */}
               <div
                 className="absolute inset-0 rounded-lg border-2 border-transparent"
                 style={{
@@ -65,7 +61,6 @@ const NowPlayingBar: React.FC<NowPlayingBarProps> = ({ vinyls }) => {
             </div>
           )}
 
-          {/* Track info */}
           <div className="flex-1 min-w-0">
             <div className="text-white text-[13px] font-semibold truncate leading-tight">
               {currentTrack.title}
@@ -75,7 +70,6 @@ const NowPlayingBar: React.FC<NowPlayingBarProps> = ({ vinyls }) => {
             </div>
           </div>
 
-          {/* Equalizer bars */}
           <div className="flex items-end gap-[2px] h-5 pr-1">
             {[0, 1, 2, 3, 4].map(i => (
               <div
@@ -84,7 +78,7 @@ const NowPlayingBar: React.FC<NowPlayingBarProps> = ({ vinyls }) => {
                 style={{
                   backgroundColor: color,
                   animation: visible ? `eqBar 0.${4 + i}s ease-in-out infinite alternate` : 'none',
-                  height: `${8 + Math.random() * 12}px`,
+                  height: '8px',
                   animationDelay: `${i * 0.08}s`,
                 }}
               />

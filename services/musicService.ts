@@ -24,8 +24,8 @@ class AudioManager {
     return () => { this.listeners = this.listeners.filter(l => l !== fn); };
   }
 
-  private notify() {
-    this.listeners.forEach(fn => fn(this.isPlaying, this.currentUrl));
+  private notify(playing: boolean, url: string | null) {
+    this.listeners.forEach(fn => fn(playing, url));
   }
 
   play(url: string) {
@@ -37,11 +37,17 @@ class AudioManager {
     this.currentAudio.volume = 0;
     this.currentAudio.loop = true;
 
+    // Notify immediately with the URL so UI can show it
+    this.notify(true, url);
+
     const playPromise = this.currentAudio.play();
     if (playPromise !== undefined) {
       playPromise
-        .then(() => { this.fadeIn(); this.notify(); })
-        .catch(error => console.warn("Audio play blocked:", error));
+        .then(() => this.fadeIn())
+        .catch(error => {
+          console.warn("Audio play blocked:", error);
+          this.notify(false, null);
+        });
     }
   }
 
@@ -51,8 +57,8 @@ class AudioManager {
       this.currentAudio = null;
       this.currentUrl = null;
       this.fadeOut(audioToFade);
-      this.notify();
     }
+    this.notify(false, null);
   }
 
   private fadeIn() {

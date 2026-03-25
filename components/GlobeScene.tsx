@@ -37,37 +37,28 @@ const SunLight: React.FC = () => {
 };
 
 // Camera fly-in on intro exit
-const IntroFlyIn: React.FC<{ active: boolean }> = ({ active }) => {
+const IntroFlyIn: React.FC<{ introActive: boolean }> = ({ introActive }) => {
   const { camera } = useThree();
-  const started = useRef(false);
-  const progress = useRef(0);
-  const startPos = useRef(new THREE.Vector3());
+  const wasIntroActive = useRef(true);
+  const progress = useRef(-1); // -1 = not animating
 
   useEffect(() => {
-    if (!active && !started.current) {
-      started.current = true;
-      progress.current = 0;
-      startPos.current.copy(camera.position);
-      // Start from further away
+    // Trigger fly-in when intro goes from active to inactive
+    if (wasIntroActive.current && !introActive) {
       camera.position.setLength(GLOBE_RADIUS * 8);
-      startPos.current.copy(camera.position);
+      progress.current = 0;
     }
-  }, [active, camera]);
+    wasIntroActive.current = introActive;
+  }, [introActive, camera]);
 
   useFrame(() => {
-    if (!started.current || progress.current >= 1) return;
+    if (progress.current < 0 || progress.current >= 1) return;
 
-    progress.current = Math.min(1, progress.current + 0.012);
-    // Ease out cubic
-    const t = 1 - Math.pow(1 - progress.current, 3);
-    const targetDist = GLOBE_RADIUS * 3.5;
-    const currentDist = THREE.MathUtils.lerp(GLOBE_RADIUS * 8, targetDist, t);
-    camera.position.setLength(currentDist);
+    progress.current = Math.min(1, progress.current + 0.015);
+    const t = 1 - Math.pow(1 - progress.current, 3); // ease-out cubic
+    const dist = THREE.MathUtils.lerp(GLOBE_RADIUS * 8, GLOBE_RADIUS * 3.5, t);
+    camera.position.setLength(dist);
     camera.lookAt(0, 0, 0);
-
-    if (progress.current >= 1) {
-      started.current = false;
-    }
   });
 
   return null;
@@ -105,56 +96,46 @@ const FlyToController: React.FC<{ target: { lat: number; lng: number } | null }>
   return null;
 };
 
-// Floating city labels on the globe — only show top cities for performance
-const LABEL_CITIES = REGIONS.filter((_, i) => i < 30); // First 30 major cities
+// Floating city labels — uses refs to avoid setState in useFrame
+const LABEL_CITIES = REGIONS.filter((_, i) => i < 30);
 
-const CityLabels: React.FC = () => {
-  const { camera } = useThree();
-  const [visibleLabels, setVisibleLabels] = useState<typeof LABEL_CITIES>([]);
+const CityLabel: React.FC<{ city: typeof REGIONS[0] }> = ({ city }) => {
+  const ref = useRef<THREE.Group>(null);
+  const pos = useMemo(() => latLngToSphere(city.lat, city.lng, GLOBE_RADIUS * 1.03), [city.lat, city.lng]);
 
-  useFrame(() => {
-    // Only show labels when zoomed in enough
+  useFrame(({ camera }) => {
+    if (!ref.current) return;
     const dist = camera.position.length();
-    if (dist > GLOBE_RADIUS * 4) {
-      if (visibleLabels.length > 0) setVisibleLabels([]);
-      return;
-    }
-
-    // Show labels facing the camera
     const camDir = camera.position.clone().normalize();
-    const visible = LABEL_CITIES.filter(city => {
-      const pos = latLngToSphere(city.lat, city.lng, GLOBE_RADIUS);
-      const dot = pos.clone().normalize().dot(camDir);
-      return dot > 0.3; // Only front-facing
-    });
+    const labelDir = pos.clone().normalize();
+    const dot = labelDir.dot(camDir);
 
-    // Update only when count changes significantly
-    if (Math.abs(visible.length - visibleLabels.length) > 2) {
-      setVisibleLabels(visible);
-    }
+    // Only visible when zoomed in and facing camera
+    ref.current.visible = dist < GLOBE_RADIUS * 4 && dot > 0.3;
   });
 
   return (
-    <>
-      {visibleLabels.map(city => {
-        const pos = latLngToSphere(city.lat, city.lng, GLOBE_RADIUS * 1.03);
-        return (
-          <Html
-            key={city.name}
-            position={[pos.x, pos.y, pos.z]}
-            center
-            style={{ pointerEvents: 'none' }}
-            distanceFactor={4}
-          >
-            <div className="text-[9px] font-semibold text-white/30 uppercase tracking-[0.15em] whitespace-nowrap select-none">
-              {city.name}
-            </div>
-          </Html>
-        );
-      })}
-    </>
+    <group ref={ref} position={[pos.x, pos.y, pos.z]} visible={false}>
+      <Html
+        center
+        style={{ pointerEvents: 'none' }}
+        distanceFactor={4}
+      >
+        <div className="text-[9px] font-semibold text-white/30 uppercase tracking-[0.15em] whitespace-nowrap select-none">
+          {city.name}
+        </div>
+      </Html>
+    </group>
   );
 };
+
+const CityLabels: React.FC = () => (
+  <>
+    {LABEL_CITIES.map(city => (
+      <CityLabel key={city.name} city={city} />
+    ))}
+  </>
+);
 
 // Ambient floating particles around the globe
 const AmbientParticles: React.FC = () => {
@@ -165,14 +146,13 @@ const AmbientParticles: React.FC = () => {
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const palette = [
-      [0, 0.85, 1],    // cyan
-      [1, 0.84, 0],    // gold
-      [1, 0.24, 0.67],  // pink
-      [0.52, 0.37, 0.76], // purple
+      [0, 0.85, 1],
+      [1, 0.84, 0],
+      [1, 0.24, 0.67],
+      [0.52, 0.37, 0.76],
     ];
 
     for (let i = 0; i < count; i++) {
-      // Random positions in a shell around the globe
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       const r = GLOBE_RADIUS * (1.3 + Math.random() * 2);
@@ -230,7 +210,7 @@ const GlobeContent: React.FC<{
   return (
     <>
       <SunLight />
-      <IntroFlyIn active={!!introActive} />
+      <IntroFlyIn introActive={!!introActive} />
       <FlyToController target={flyToTarget ?? null} />
 
       <Stars

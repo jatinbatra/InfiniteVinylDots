@@ -14,10 +14,10 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ loadedCities, totalCities, on
   useEffect(() => {
     if (loadedCities.length >= 6 && !ready) {
       setReady(true);
-      // Short delay before showing CTA
-      setTimeout(() => setStep(1), 400);
+      const timer = setTimeout(() => setStep(1), 400);
+      return () => clearTimeout(timer);
     }
-  }, [loadedCities, ready]);
+  }, [loadedCities.length, ready]);
 
   const handleEnter = () => {
     setFadeOut(true);
@@ -30,7 +30,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ loadedCities, totalCities, on
   return (
     <div
       className={`fixed inset-0 z-[200] flex flex-col items-center justify-center transition-all duration-500 ${
-        fadeOut ? 'opacity-0 scale-105' : 'opacity-100 scale-100'
+        fadeOut ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
       }`}
       style={{
         background: 'radial-gradient(ellipse at 50% 40%, #0a0a0a 0%, #000 70%)',

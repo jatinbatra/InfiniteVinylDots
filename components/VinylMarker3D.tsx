@@ -63,6 +63,9 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
   if (coverUrl) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    img.onerror = () => {
+      // Keep the colored dot fallback — no action needed
+    };
     img.onload = () => {
       ctx.clearRect(0, 0, size, size);
 
@@ -126,6 +129,13 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   const [hovered, setHovered] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinAngle = useRef(Math.random() * Math.PI * 2);
+
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    };
+  }, []);
 
   const position = useMemo(() => {
     return latLngToSphere(vinyl.lat ?? 0, vinyl.lng ?? 0, GLOBE_RADIUS * 1.008);
