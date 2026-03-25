@@ -7,6 +7,7 @@ import SearchBar from './components/SearchBar';
 import IntroScreen from './components/IntroScreen';
 import NowPlayingBar from './components/NowPlayingBar';
 import ActivityTicker from './components/ActivityTicker';
+import VinylVortex from './components/VinylVortex';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
   const [showIntro, setShowIntro] = useState(true);
+  const [vortexMode, setVortexMode] = useState(false);
   const [loadedCityNames, setLoadedCityNames] = useState<string[]>([]);
 
   const regionsRef = useRef(regions);
@@ -231,22 +233,28 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* 3D Globe — renders behind intro for instant reveal */}
-      <GlobeScene
-        vinyls={allVinyls}
-        onVinylClick={handleVinylClick}
-        audioUnlocked={audioUnlocked}
-        flyToTarget={flyToTarget}
-        introActive={showIntro}
-      />
+      {/* Vortex mode — replaces globe */}
+      {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
 
-      {/* UI — only show after intro dismissed */}
-      {!showIntro && (
+      {/* 3D Globe — unmounted during vortex to free WebGL context */}
+      {!vortexMode && (
+        <GlobeScene
+          vinyls={allVinyls}
+          onVinylClick={handleVinylClick}
+          audioUnlocked={audioUnlocked}
+          flyToTarget={flyToTarget}
+          introActive={showIntro}
+        />
+      )}
+
+      {/* UI — only show after intro dismissed and not in vortex */}
+      {!showIntro && !vortexMode && (
         <>
           <SearchBar onFlyTo={handleFlyTo} />
 
           <Hud
             onDropVinyl={() => setIsDropModalOpen(true)}
+            onVortex={() => setVortexMode(true)}
             myVinyl={myVinyl}
             vinylCount={allVinyls.length}
             regionCount={loadedRegionCount}

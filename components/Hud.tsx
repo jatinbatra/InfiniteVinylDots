@@ -3,13 +3,14 @@ import { VinylRecord } from '../types';
 
 interface HudProps {
   onDropVinyl: () => void;
+  onVortex?: () => void;
   myVinyl?: VinylRecord;
   vinylCount?: number;
   regionCount?: number;
   totalRegions?: number;
 }
 
-const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0 }) => {
+const Hud: React.FC<HudProps> = ({ onDropVinyl, onVortex, myVinyl, vinylCount = 0 }) => {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -57,6 +58,21 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, myVinyl, vinylCount = 0 }) => {
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
           </svg>
         </button>
+
+        {/* Vortex mode button */}
+        {onVortex && (
+          <button
+            onClick={onVortex}
+            className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center text-cyan-400/70 hover:text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-all"
+            title="Turntable God Mode"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v4M12 18v4" />
+            </svg>
+          </button>
+        )}
 
         {/* Drop vinyl button */}
         <button
