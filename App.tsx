@@ -4,7 +4,6 @@ import PlayerModal from './components/PlayerModal';
 import Hud from './components/Hud';
 import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
-import IntroScreen from './components/IntroScreen';
 import NowPlayingBar from './components/NowPlayingBar';
 import ActivityTicker from './components/ActivityTicker';
 import VinylVortex from './components/VinylVortex';
@@ -18,9 +17,7 @@ const App: React.FC = () => {
   const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
-  const [showIntro, setShowIntro] = useState(true);
   const [vortexMode, setVortexMode] = useState(false);
-  const [loadedCityNames, setLoadedCityNames] = useState<string[]>([]);
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
@@ -64,12 +61,6 @@ const App: React.FC = () => {
         return next;
       });
 
-      const newNames = batch
-        .filter((_, idx) => results[idx].status === 'fulfilled' && (results[idx] as PromiseFulfilledResult<any>).value)
-        .map(r => r.name);
-      if (newNames.length > 0) {
-        setLoadedCityNames(prev => [...prev, ...newNames]);
-      }
     };
 
     const loadAllRegions = async () => {
@@ -212,31 +203,21 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full font-sans text-white">
-      {/* Intro / Loading Screen */}
-      {showIntro && (
-        <IntroScreen
-          loadedCities={loadedCityNames}
-          totalCities={REGIONS.length}
-          onEnter={() => setShowIntro(false)}
-        />
-      )}
-
       {/* Vortex mode — replaces globe */}
       {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
 
-      {/* 3D Globe — unmounted during vortex to free WebGL context */}
+      {/* 3D Globe — shows immediately, dots appear as they load */}
       {!vortexMode && (
         <GlobeScene
           vinyls={allVinyls}
           onVinylClick={handleVinylClick}
           audioUnlocked={audioUnlocked}
           flyToTarget={flyToTarget}
-          introActive={showIntro}
         />
       )}
 
-      {/* UI — only show after intro dismissed and not in vortex */}
-      {!showIntro && !vortexMode && (
+      {/* UI — always visible (unless vortex) */}
+      {!vortexMode && (
         <>
           <SearchBar onFlyTo={handleFlyTo} />
 
