@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useCallback } from 'react';
+import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -13,56 +13,113 @@ interface VinylMarker3DProps {
   audioUnlocked: boolean;
 }
 
-// Create a vinyl disc texture (black disc with grooves + colored center)
-function createVinylTexture(color: string): THREE.CanvasTexture {
+// Texture cache — avoids recreating identical textures
+const textureCache = new Map<string, THREE.CanvasTexture>();
+
+/**
+ * Creates a bright, visible circular texture.
+ * Draws album art as a circle when loaded, falls back to a glowing colored dot.
+ */
+function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasTexture {
+  const cacheKey = `${coverUrl || color}`;
+  if (textureCache.has(cacheKey)) return textureCache.get(cacheKey)!;
+
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   const cx = size / 2;
-  const cy = size / 2;
+  const r = cx - 4;
 
-  // Black vinyl disc
-  ctx.fillStyle = '#111';
+  // Draw bright colored circle as default
   ctx.beginPath();
-  ctx.arc(cx, cy, cx, 0, Math.PI * 2);
+  ctx.arc(cx, cx, r, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, r);
+  grad.addColorStop(0, lighten(color, 40));
+  grad.addColorStop(0.7, color);
+  grad.addColorStop(1, darken(color, 40));
+  ctx.fillStyle = grad;
   ctx.fill();
 
-  // Grooves (concentric rings)
-  for (let r = 14; r < cx - 2; r += 3) {
-    ctx.strokeStyle = r % 6 === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  // Outer glow ring
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.6;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 
-  // Colored center label
-  ctx.fillStyle = color;
+  // Center dot (vinyl spindle look)
   ctx.beginPath();
-  ctx.arc(cx, cy, 12, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Center hole
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Shine highlight
-  const shine = ctx.createRadialGradient(cx - 15, cy - 15, 0, cx, cy, cx);
-  shine.addColorStop(0, 'rgba(255,255,255,0.15)');
-  shine.addColorStop(0.4, 'rgba(255,255,255,0)');
-  shine.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = shine;
-  ctx.beginPath();
-  ctx.arc(cx, cy, cx, 0, Math.PI * 2);
+  ctx.arc(cx, cx, 4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fill();
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
+  textureCache.set(cacheKey, tex);
+
+  // Load album art asynchronously and repaint
+  if (coverUrl) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onerror = () => {
+      // Keep the colored dot fallback — no action needed
+    };
+    img.onload = () => {
+      ctx.clearRect(0, 0, size, size);
+
+      // Clip to circle
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cx, r, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Draw album art
+      ctx.drawImage(img, 0, 0, size, size);
+      ctx.restore();
+
+      // Colored ring border
+      ctx.beginPath();
+      ctx.arc(cx, cx, r, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.8;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Center hole
+      ctx.beginPath();
+      ctx.arc(cx, cx, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      tex.needsUpdate = true;
+    };
+    // Use smaller image for texture (60x60 is plenty for a dot)
+    img.src = coverUrl.replace('600x600', '60x60');
+  }
+
   return tex;
+}
+
+function lighten(hex: string, amt: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, (num >> 16) + amt);
+  const g = Math.min(255, ((num >> 8) & 0xff) + amt);
+  const b = Math.min(255, (num & 0xff) + amt);
+  return `rgb(${r},${g},${b})`;
+}
+
+function darken(hex: string, amt: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.max(0, (num >> 16) - amt);
+  const g = Math.max(0, ((num >> 8) & 0xff) - amt);
+  const b = Math.max(0, (num & 0xff) - amt);
+  return `rgb(${r},${g},${b})`;
 }
 
 const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlocked }) => {
@@ -71,52 +128,51 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   const glowRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const spinAngle = useRef(0);
+  const spinAngle = useRef(Math.random() * Math.PI * 2);
+
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    };
+  }, []);
 
   const position = useMemo(() => {
-    const lat = vinyl.lat ?? 0;
-    const lng = vinyl.lng ?? 0;
-    return latLngToSphere(lat, lng, GLOBE_RADIUS * 1.005);
+    return latLngToSphere(vinyl.lat ?? 0, vinyl.lng ?? 0, GLOBE_RADIUS * 1.008);
   }, [vinyl.lat, vinyl.lng]);
 
   const normal = useMemo(() => position.clone().normalize(), [position]);
-
   const vinylColor = vinyl.circadianColor || '#00D9FF';
+  const texture = useMemo(() => createMarkerTexture(vinylColor, vinyl.coverUrl), [vinylColor, vinyl.coverUrl]);
 
-  const texture = useMemo(() => createVinylTexture(vinylColor), [vinylColor]);
-
-  // Quaternion to orient disc to face outward from globe
+  // Orient disc to face outward from globe
   const quaternion = useMemo(() => {
     const q = new THREE.Quaternion();
-    const up = new THREE.Vector3(0, 0, 1);
-    q.setFromUnitVectors(up, normal);
+    q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     return q;
   }, [normal]);
 
-  const markerSize = vinyl.isOwner ? 0.06 : 0.04;
+  const markerSize = vinyl.isOwner ? 0.09 : 0.07;
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Scale animation
-    const targetScale = hovered ? 2.8 : 1;
+    // Scale
+    const targetScale = hovered ? 1.8 : 1;
     const s = groupRef.current.scale.x;
-    const newScale = THREE.MathUtils.lerp(s, targetScale, 0.12);
-    groupRef.current.scale.setScalar(newScale);
+    groupRef.current.scale.setScalar(THREE.MathUtils.lerp(s, targetScale, 0.12));
 
-    // Spin the disc when hovered or playing
+    // Spin
     if (discRef.current) {
-      if (hovered || vinyl.isPlaying) {
-        spinAngle.current += delta * (hovered ? 4 : 1.5);
-      }
+      const speed = hovered ? 4 : (vinyl.isPlaying ? 1.5 : 0.2);
+      spinAngle.current += delta * speed;
       discRef.current.rotation.z = spinAngle.current;
     }
 
-    // Pulse glow
+    // Glow pulse
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshBasicMaterial;
-      const pulse = 0.08 + Math.sin(Date.now() * 0.004 + position.x * 10) * 0.04;
-      mat.opacity = hovered ? 0.3 : pulse;
+      mat.opacity = hovered ? 0.35 : 0.12 + Math.sin(Date.now() * 0.002 + position.x * 5) * 0.06;
     }
   });
 
@@ -147,7 +203,7 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
 
   return (
     <group position={position} quaternion={quaternion} ref={groupRef}>
-      {/* Vinyl disc */}
+      {/* Album art disc */}
       <mesh
         ref={discRef}
         onPointerOver={handlePointerOver}
@@ -158,90 +214,67 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
         <meshBasicMaterial
           map={texture}
           transparent
-          opacity={hovered ? 1 : 0.9}
+          opacity={hovered ? 1 : 0.95}
           side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
 
-      {/* Glow ring */}
-      <mesh ref={glowRef}>
-        <ringGeometry args={[markerSize * 0.9, markerSize * 2.5, 32]} />
+      {/* Soft glow behind */}
+      <mesh ref={glowRef} position={[0, 0, -0.001]}>
+        <circleGeometry args={[markerSize * 1.8, 24]} />
         <meshBasicMaterial
           color={vinylColor}
           transparent
-          opacity={0.08}
+          opacity={0.12}
           side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
 
-      {/* Owner marker - gold outer ring */}
+      {/* Owner ring */}
       {vinyl.isOwner && (
-        <mesh>
-          <ringGeometry args={[markerSize * 2.2, markerSize * 2.8, 32]} />
-          <meshBasicMaterial color="#FFD700" transparent opacity={0.6} side={THREE.DoubleSide} />
+        <mesh position={[0, 0, -0.0005]}>
+          <ringGeometry args={[markerSize * 1.1, markerSize * 1.4, 32]} />
+          <meshBasicMaterial color="#FFD700" transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       )}
 
-      {/* Hover tooltip */}
+      {/* Tooltip */}
       {hovered && (
         <Html
-          position={[0, markerSize * 4, 0]}
+          position={[0, markerSize * 3.5, 0]}
           center
           style={{ pointerEvents: 'none', transform: 'translate(-50%, -100%)' }}
-          distanceFactor={3}
+          distanceFactor={2.5}
         >
-          <div
-            className="bg-black/95 backdrop-blur-xl border border-white/10 px-4 py-3 rounded-xl shadow-2xl flex flex-col items-center gap-1 min-w-[200px] whitespace-nowrap"
-            style={{ animation: 'tooltipIn 0.2s ease-out' }}
-          >
+          <div className="bg-black/90 backdrop-blur-xl border border-white/10 px-3 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 whitespace-nowrap">
             {vinyl.coverUrl && (
               <img
-                src={vinyl.coverUrl}
+                src={vinyl.coverUrl.replace('600x600', '100x100')}
                 alt=""
-                className="w-12 h-12 rounded-lg object-cover mb-1 shadow-lg"
+                className="w-11 h-11 rounded-lg object-cover flex-shrink-0 shadow-lg"
               />
             )}
-            <span className="text-white font-bold text-sm leading-tight text-center max-w-[200px] truncate">
-              {vinyl.title}
-            </span>
-            <span className="text-xs font-medium" style={{ color: vinylColor }}>
-              {vinyl.artist}
-            </span>
-            <div className="flex items-center gap-2 mt-0.5">
-              {vinyl.genre?.[0] && (
-                <span className="text-zinc-500 text-[10px]">{vinyl.genre[0]}</span>
-              )}
-              {vinyl.circadianMood && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10"
-                  style={{ color: vinylColor }}>
-                  {vinyl.circadianMood}
-                </span>
-              )}
-            </div>
-            {vinyl.previewUrl && audioUnlocked && (
-              <div className="text-[9px] text-zinc-500 flex items-center gap-1 mt-1">
-                <div className="flex gap-[2px] items-end h-3">
-                  <div className="w-[2px] h-1 rounded-full animate-pulse" style={{ backgroundColor: vinylColor }} />
-                  <div className="w-[2px] h-2 rounded-full animate-pulse" style={{ backgroundColor: vinylColor, animationDelay: '0.1s' }} />
-                  <div className="w-[2px] h-1.5 rounded-full animate-pulse" style={{ backgroundColor: vinylColor, animationDelay: '0.2s' }} />
-                </div>
-                Previewing
+            <div className="min-w-0 pr-1">
+              <div className="text-white font-semibold text-[13px] leading-tight truncate max-w-[180px]">
+                {vinyl.title}
               </div>
-            )}
-          </div>
-          {vinyl.listenerCount > 0 && (
-            <div className="flex justify-center -mt-1">
-              <span className="text-black text-[9px] font-bold bg-yellow-400 px-2 py-0.5 rounded-full shadow-lg">
-                {vinyl.listenerCount > 999 ? `${(vinyl.listenerCount / 1000).toFixed(1)}k` : vinyl.listenerCount} listening
-              </span>
+              <div className="text-zinc-400 text-[11px] truncate max-w-[180px] mt-0.5">
+                {vinyl.artist}
+              </div>
+              <div className="text-zinc-600 text-[10px] mt-0.5 flex items-center gap-1.5">
+                {vinyl.genre?.[0] && <span>{vinyl.genre[0]}</span>}
+                {vinyl.previewUrl && audioUnlocked && (
+                  <span className="flex items-center gap-[2px]">
+                    <span className="inline-block w-[3px] h-[6px] rounded-full animate-pulse" style={{ backgroundColor: vinylColor }} />
+                    <span className="inline-block w-[3px] h-[9px] rounded-full animate-pulse" style={{ backgroundColor: vinylColor, animationDelay: '0.15s' }} />
+                    <span className="inline-block w-[3px] h-[7px] rounded-full animate-pulse" style={{ backgroundColor: vinylColor, animationDelay: '0.3s' }} />
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-          <style>{`
-            @keyframes tooltipIn {
-              from { opacity: 0; transform: translate(-50%, -90%) scale(0.9); }
-              to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
-            }
-          `}</style>
+          </div>
         </Html>
       )}
     </group>

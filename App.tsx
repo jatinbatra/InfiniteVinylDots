@@ -4,8 +4,11 @@ import PlayerModal from './components/PlayerModal';
 import Hud from './components/Hud';
 import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
+import IntroScreen from './components/IntroScreen';
+import NowPlayingBar from './components/NowPlayingBar';
+import ActivityTicker from './components/ActivityTicker';
+import VinylVortex from './components/VinylVortex';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
-import { getCircadianMood, getCircadianSearchTerm } from './services/circadianService';
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
 
@@ -15,13 +18,9 @@ const App: React.FC = () => {
   const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
-  const [hoveredRegionInfo, setHoveredRegionInfo] = useState<{
-    name: string;
-    mood: string;
-    emoji: string;
-    color: string;
-    localTime: string;
-  } | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
+  const [vortexMode, setVortexMode] = useState(false);
+  const [loadedCityNames, setLoadedCityNames] = useState<string[]>([]);
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
@@ -41,38 +40,57 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Load all regions on mount (globe shows everything)
+  // Load cities — batch 4 concurrent requests for speed
   useEffect(() => {
     const loadAllRegions = async () => {
-      // Stagger loading to avoid rate-limiting
-      for (let i = 0; i < REGIONS.length; i++) {
-        const r = REGIONS[i];
+      const batchSize = 4;
+      for (let i = 0; i < REGIONS.length; i += batchSize) {
+        const batch = REGIONS.slice(i, i + batchSize);
 
-        // Skip if already loaded
-        if (regionsRef.current[r.code]) continue;
+        // Mark all in batch as loading
+        setRegions(prev => {
+          const next = { ...prev };
+          for (const r of batch) {
+            if (!next[r.name]) {
+              next[r.name] = { id: r.name, status: 'loading', data: [] };
+            }
+          }
+          return next;
+        });
 
-        // Mark as loading
-        setRegions(prev => ({
-          ...prev,
-          [r.code]: { id: r.code, status: 'loading', data: [] }
-        }));
+        // Fetch batch concurrently
+        const results = await Promise.allSettled(
+          batch.map(r =>
+            regionsRef.current[r.name]?.status === 'loaded'
+              ? Promise.resolve(null) // skip already loaded
+              : fetchRegionalTracks(r.code, r.lat, r.lng, r.name)
+          )
+        );
 
-        try {
-          const vinyls = await fetchRegionalTracks(r.code, r.lat, r.lng);
-          setRegions(prev => ({
-            ...prev,
-            [r.code]: { id: r.code, status: 'loaded', data: vinyls }
-          }));
-        } catch {
-          setRegions(prev => ({
-            ...prev,
-            [r.code]: { id: r.code, status: 'error', data: [] }
-          }));
+        setRegions(prev => {
+          const next = { ...prev };
+          results.forEach((result, idx) => {
+            const r = batch[idx];
+            if (result.status === 'fulfilled' && result.value) {
+              next[r.name] = { id: r.name, status: 'loaded', data: result.value };
+            } else if (result.status === 'rejected') {
+              next[r.name] = { id: r.name, status: 'error', data: [] };
+            }
+          });
+          return next;
+        });
+
+        // Track loaded city names for the intro screen
+        const newNames = batch
+          .filter((_, idx) => results[idx].status === 'fulfilled' && (results[idx] as PromiseFulfilledResult<any>).value)
+          .map(r => r.name);
+        if (newNames.length > 0) {
+          setLoadedCityNames(prev => [...prev, ...newNames]);
         }
 
-        // Small delay between requests to be nice to the API
-        if (i < REGIONS.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+        // Brief pause between batches to avoid rate-limiting
+        if (i + batchSize < REGIONS.length) {
+          await new Promise(resolve => setTimeout(resolve, 150));
         }
       }
     };
@@ -130,7 +148,7 @@ const App: React.FC = () => {
     if (data.searchTerm) {
       const tracks = await fetchTrackSearch(data.searchTerm);
       if (tracks.length > 0) {
-        newVinyl = { ...tracks[0], lat: 40, lng: -74, isOwner: true }; // Default to NYC
+        newVinyl = { ...tracks[0], lat: 40, lng: -74, isOwner: true };
       } else {
         return;
       }
@@ -171,7 +189,7 @@ const App: React.FC = () => {
     setSelectedVinyl(newVinyl);
   };
 
-  // Circadian refresh: refresh regions periodically with time-appropriate music
+  // Circadian refresh
   useEffect(() => {
     const interval = setInterval(() => {
       const loadedKeys = Object.keys(regionsRef.current).filter(
@@ -179,62 +197,26 @@ const App: React.FC = () => {
       );
       if (loadedKeys.length === 0) return;
 
-      // Pick a random region to refresh
       const randomKey = loadedKeys[Math.floor(Math.random() * loadedKeys.length)];
-      const region = REGIONS.find(r => r.code === randomKey);
+      const region = REGIONS.find(r => r.name === randomKey);
       if (!region) return;
 
-      const searchTerm = getCircadianSearchTerm(region.lng);
-      const mood = getCircadianMood(region.lng);
-
-      fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${randomKey}&entity=song&limit=50`)
-        .then(res => res.json())
-        .then(data => {
-          if (!data.results || data.results.length === 0) return;
-
-          const newVinyls: VinylRecord[] = data.results.map((item: any, index: number) => {
-            const angle = (index * 137.5) * (Math.PI / 180);
-            const radius = Math.sqrt(index) * 60;
-            return {
-              id: `${randomKey}-refresh-${item.trackId}-${Date.now()}`,
-              albumId: item.collectionId,
-              title: item.trackName,
-              artist: item.artistName,
-              year: new Date(item.releaseDate).getFullYear(),
-              coverUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100', '600x600') : '',
-              previewUrl: item.previewUrl,
-              sourceType: 'itunes' as const,
-              lat: region.lat + (Math.sin(angle) * radius) / 111,
-              lng: region.lng + (Math.cos(angle) * radius) / (111 * Math.cos(region.lat * Math.PI / 180)),
-              position: { x: 0, y: 0 },
-              listenerCount: Math.floor(Math.random() * 1000) + 50,
-              genre: [item.primaryGenreName || searchTerm],
-              isPlaying: Math.random() > 0.4,
-              isOwner: false,
-              likes: Math.floor(Math.random() * 500),
-              isLiked: false,
-              isJoined: false,
-              isFollowed: false,
-              ownerAvatar: `https://i.pravatar.cc/150?u=${item.artistName?.replace(/\s/g, '')}`,
-              circadianColor: mood.color,
-              circadianMood: mood.name,
-            };
-          });
-
+      fetchRegionalTracks(region.code, region.lat, region.lng, region.name)
+        .then(newVinyls => {
+          if (newVinyls.length === 0) return;
           setRegions(prev => ({
             ...prev,
             [randomKey]: { id: randomKey, status: 'loaded', data: newVinyls }
           }));
         })
         .catch(() => {});
-    }, 30000); // Refresh every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
 
   const handleFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToTarget({ lat, lng });
-    // Clear after animation has time to complete
     setTimeout(() => setFlyToTarget(null), 3000);
   }, []);
 
@@ -242,40 +224,61 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full font-sans text-white">
-      {/* 3D Globe */}
-      <GlobeScene
-        vinyls={allVinyls}
-        onVinylClick={handleVinylClick}
-        audioUnlocked={audioUnlocked}
-        flyToTarget={flyToTarget}
-      />
-
-      {/* Search */}
-      <SearchBar onFlyTo={handleFlyTo} />
-
-      {/* HUD Overlay */}
-      <Hud
-        onDropVinyl={() => setIsDropModalOpen(true)}
-        myVinyl={myVinyl}
-        vinylCount={allVinyls.length}
-        regionCount={loadedRegionCount}
-        totalRegions={REGIONS.length}
-      />
-
-      {/* Modals */}
-      {selectedVinyl && (
-        <PlayerModal
-          vinyl={selectedVinyl}
-          onClose={handleCloseModal}
-          onUpdate={handleVinylUpdate}
+      {/* Intro / Loading Screen */}
+      {showIntro && (
+        <IntroScreen
+          loadedCities={loadedCityNames}
+          totalCities={REGIONS.length}
+          onEnter={() => setShowIntro(false)}
         />
       )}
 
-      {isDropModalOpen && (
-        <DropModal
-          onClose={() => setIsDropModalOpen(false)}
-          onSubmit={handleDropSubmit}
+      {/* Vortex mode — replaces globe */}
+      {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
+
+      {/* 3D Globe — unmounted during vortex to free WebGL context */}
+      {!vortexMode && (
+        <GlobeScene
+          vinyls={allVinyls}
+          onVinylClick={handleVinylClick}
+          audioUnlocked={audioUnlocked}
+          flyToTarget={flyToTarget}
+          introActive={showIntro}
         />
+      )}
+
+      {/* UI — only show after intro dismissed and not in vortex */}
+      {!showIntro && !vortexMode && (
+        <>
+          <SearchBar onFlyTo={handleFlyTo} />
+
+          <Hud
+            onDropVinyl={() => setIsDropModalOpen(true)}
+            onVortex={() => setVortexMode(true)}
+            myVinyl={myVinyl}
+            vinylCount={allVinyls.length}
+            regionCount={loadedRegionCount}
+            totalRegions={REGIONS.length}
+          />
+
+          <NowPlayingBar vinyls={allVinyls} />
+          <ActivityTicker vinyls={allVinyls} />
+
+          {selectedVinyl && (
+            <PlayerModal
+              vinyl={selectedVinyl}
+              onClose={handleCloseModal}
+              onUpdate={handleVinylUpdate}
+            />
+          )}
+
+          {isDropModalOpen && (
+            <DropModal
+              onClose={() => setIsDropModalOpen(false)}
+              onSubmit={handleDropSubmit}
+            />
+          )}
+        </>
       )}
     </div>
   );

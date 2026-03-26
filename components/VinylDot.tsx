@@ -15,7 +15,7 @@ const VinylDot: React.FC<VinylDotProps> = ({ vinyl, scale, onClick, audioUnlocke
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
-  const baseSize = vinyl.listenerCount > 50 ? 55 : CANVAS_OPTS.DOT_BASE_SIZE;
+  const baseSize = vinyl.listenerCount > 50 ? 80 : CANVAS_OPTS.DOT_BASE_SIZE;
   const hoverSize = CANVAS_OPTS.DOT_HOVER_SIZE;
 
   // Inverse scale for text so it stays readable at any zoom
@@ -46,7 +46,7 @@ const VinylDot: React.FC<VinylDotProps> = ({ vinyl, scale, onClick, audioUnlocke
     if (mouseDownPos.current) {
       const dx = Math.abs(e.clientX - mouseDownPos.current.x);
       const dy = Math.abs(e.clientY - mouseDownPos.current.y);
-      if (dx < 5 && dy < 5) {
+      if (dx < 10 && dy < 10) {
         e.stopPropagation();
         audioManager.stop();
         onClick(vinyl);

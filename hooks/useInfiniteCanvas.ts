@@ -153,7 +153,7 @@ export const useInfiniteCanvas = () => {
 
   // Was this a click (not a drag)?
   const wasClick = useCallback(() => {
-    return dragDistance.current < 5;
+    return dragDistance.current < 10;
   }, []);
 
   return {
