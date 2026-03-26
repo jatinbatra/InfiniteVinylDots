@@ -147,7 +147,7 @@ export const fetchRegionalTracks = async (
     const key = cityName || regionCode;
 
     const response = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=50`
+      `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=20`
     );
     const data: any = await response.json();
     if (!data.results) return [];

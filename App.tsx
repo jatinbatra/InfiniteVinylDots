@@ -4,7 +4,6 @@ import PlayerModal from './components/PlayerModal';
 import Hud from './components/Hud';
 import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
-import IntroScreen from './components/IntroScreen';
 import NowPlayingBar from './components/NowPlayingBar';
 import ActivityTicker from './components/ActivityTicker';
 import VinylVortex from './components/VinylVortex';
@@ -18,9 +17,7 @@ const App: React.FC = () => {
   const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
-  const [showIntro, setShowIntro] = useState(true);
   const [vortexMode, setVortexMode] = useState(false);
-  const [loadedCityNames, setLoadedCityNames] = useState<string[]>([]);
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
@@ -40,58 +37,40 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Load cities — batch 4 concurrent requests for speed
+  // Load cities — fast first wave (10 concurrent), then background load rest
   useEffect(() => {
-    const loadAllRegions = async () => {
-      const batchSize = 4;
-      for (let i = 0; i < REGIONS.length; i += batchSize) {
-        const batch = REGIONS.slice(i, i + batchSize);
+    const loadBatch = async (batch: typeof REGIONS) => {
+      const results = await Promise.allSettled(
+        batch.map(r =>
+          regionsRef.current[r.name]?.status === 'loaded'
+            ? Promise.resolve(null)
+            : fetchRegionalTracks(r.code, r.lat, r.lng, r.name)
+        )
+      );
 
-        // Mark all in batch as loading
-        setRegions(prev => {
-          const next = { ...prev };
-          for (const r of batch) {
-            if (!next[r.name]) {
-              next[r.name] = { id: r.name, status: 'loading', data: [] };
-            }
+      setRegions(prev => {
+        const next = { ...prev };
+        results.forEach((result, idx) => {
+          const r = batch[idx];
+          if (result.status === 'fulfilled' && result.value) {
+            next[r.name] = { id: r.name, status: 'loaded', data: result.value };
+          } else if (result.status === 'rejected') {
+            next[r.name] = { id: r.name, status: 'error', data: [] };
           }
-          return next;
         });
+        return next;
+      });
 
-        // Fetch batch concurrently
-        const results = await Promise.allSettled(
-          batch.map(r =>
-            regionsRef.current[r.name]?.status === 'loaded'
-              ? Promise.resolve(null) // skip already loaded
-              : fetchRegionalTracks(r.code, r.lat, r.lng, r.name)
-          )
-        );
+    };
 
-        setRegions(prev => {
-          const next = { ...prev };
-          results.forEach((result, idx) => {
-            const r = batch[idx];
-            if (result.status === 'fulfilled' && result.value) {
-              next[r.name] = { id: r.name, status: 'loaded', data: result.value };
-            } else if (result.status === 'rejected') {
-              next[r.name] = { id: r.name, status: 'error', data: [] };
-            }
-          });
-          return next;
-        });
+    const loadAllRegions = async () => {
+      // Wave 1: First 10 cities (major ones) — all concurrent, no delay
+      await loadBatch(REGIONS.slice(0, 10));
 
-        // Track loaded city names for the intro screen
-        const newNames = batch
-          .filter((_, idx) => results[idx].status === 'fulfilled' && (results[idx] as PromiseFulfilledResult<any>).value)
-          .map(r => r.name);
-        if (newNames.length > 0) {
-          setLoadedCityNames(prev => [...prev, ...newNames]);
-        }
-
-        // Brief pause between batches to avoid rate-limiting
-        if (i + batchSize < REGIONS.length) {
-          await new Promise(resolve => setTimeout(resolve, 150));
-        }
+      // Wave 2: Load rest in batches of 10 with minimal delay
+      for (let i = 10; i < REGIONS.length; i += 10) {
+        const batch = REGIONS.slice(i, i + 10);
+        await loadBatch(batch);
       }
     };
 
@@ -224,31 +203,21 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full font-sans text-white">
-      {/* Intro / Loading Screen */}
-      {showIntro && (
-        <IntroScreen
-          loadedCities={loadedCityNames}
-          totalCities={REGIONS.length}
-          onEnter={() => setShowIntro(false)}
-        />
-      )}
-
       {/* Vortex mode — replaces globe */}
       {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
 
-      {/* 3D Globe — unmounted during vortex to free WebGL context */}
+      {/* 3D Globe — shows immediately, dots appear as they load */}
       {!vortexMode && (
         <GlobeScene
           vinyls={allVinyls}
           onVinylClick={handleVinylClick}
           audioUnlocked={audioUnlocked}
           flyToTarget={flyToTarget}
-          introActive={showIntro}
         />
       )}
 
-      {/* UI — only show after intro dismissed and not in vortex */}
-      {!showIntro && !vortexMode && (
+      {/* UI — always visible (unless vortex) */}
+      {!vortexMode && (
         <>
           <SearchBar onFlyTo={handleFlyTo} />
 

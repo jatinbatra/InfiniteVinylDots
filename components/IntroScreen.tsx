@@ -12,7 +12,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ loadedCities, totalCities, on
   const [step, setStep] = useState(0); // 0=loading, 1=ready
 
   useEffect(() => {
-    if (loadedCities.length >= 6 && !ready) {
+    if (loadedCities.length >= 3 && !ready) {
       setReady(true);
       const timer = setTimeout(() => setStep(1), 400);
       return () => clearTimeout(timer);
