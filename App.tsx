@@ -7,7 +7,9 @@ import SearchBar from './components/SearchBar';
 import NowPlayingBar from './components/NowPlayingBar';
 import ActivityTicker from './components/ActivityTicker';
 import VinylVortex from './components/VinylVortex';
+import CratePanel from './components/CratePanel';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
+import { getCrate } from './services/crateService';
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
 
@@ -18,6 +20,8 @@ const App: React.FC = () => {
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
   const [vortexMode, setVortexMode] = useState(false);
+  const [crateOpen, setCrateOpen] = useState(false);
+  const [crateCount, setCrateCount] = useState(() => getCrate().length);
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
@@ -25,6 +29,9 @@ const App: React.FC = () => {
   // Unlock audio on first user interaction
   useEffect(() => {
     const unlock = () => {
+      // Resume the AudioContext so browsers actually allow playback
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      ctx.resume().catch(() => {});
       setAudioUnlocked(true);
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
@@ -37,45 +44,53 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Load cities — fast first wave (10 concurrent), then background load rest
-  useEffect(() => {
-    const loadBatch = async (batch: typeof REGIONS) => {
-      const results = await Promise.allSettled(
-        batch.map(r =>
-          regionsRef.current[r.name]?.status === 'loaded'
-            ? Promise.resolve(null)
-            : fetchRegionalTracks(r.code, r.lat, r.lng, r.name)
-        )
-      );
+  // Load a batch of regions by name
+  const loadBatch = useCallback(async (names: string[]) => {
+    const toLoad = names
+      .map(n => REGIONS.find(r => r.name === n))
+      .filter((r): r is typeof REGIONS[0] => !!r && !regionsRef.current[r.name]);
 
-      setRegions(prev => {
-        const next = { ...prev };
-        results.forEach((result, idx) => {
-          const r = batch[idx];
-          if (result.status === 'fulfilled' && result.value) {
-            next[r.name] = { id: r.name, status: 'loaded', data: result.value };
-          } else if (result.status === 'rejected') {
-            next[r.name] = { id: r.name, status: 'error', data: [] };
-          }
-        });
-        return next;
+    if (toLoad.length === 0) return;
+
+    // Mark as loading
+    setRegions(prev => {
+      const next = { ...prev };
+      toLoad.forEach(r => {
+        if (!next[r.name]) next[r.name] = { id: r.name, status: 'loading', data: [] };
       });
+      return next;
+    });
 
-    };
+    const results = await Promise.allSettled(
+      toLoad.map(r => fetchRegionalTracks(r.code, r.lat, r.lng, r.name))
+    );
 
-    const loadAllRegions = async () => {
-      // Wave 1: First 10 cities (major ones) — all concurrent, no delay
-      await loadBatch(REGIONS.slice(0, 10));
-
-      // Wave 2: Load rest in batches of 10 with minimal delay
-      for (let i = 10; i < REGIONS.length; i += 10) {
-        const batch = REGIONS.slice(i, i + 10);
-        await loadBatch(batch);
-      }
-    };
-
-    loadAllRegions();
+    setRegions(prev => {
+      const next = { ...prev };
+      results.forEach((result, idx) => {
+        const r = toLoad[idx];
+        if (result.status === 'fulfilled' && result.value) {
+          next[r.name] = { id: r.name, status: 'loaded', data: result.value };
+        } else if (result.status === 'rejected') {
+          next[r.name] = { id: r.name, status: 'error', data: [] };
+        }
+      });
+      return next;
+    });
   }, []);
+
+  // Wave 1: Load first 10 cities on mount so globe isn't empty
+  useEffect(() => {
+    loadBatch(REGIONS.slice(0, 10).map(r => r.name));
+  }, [loadBatch]);
+
+  // Lazy load: fetch regions as camera reveals them
+  const handleVisibleRegions = useCallback((regionNames: string[]) => {
+    const unloaded = regionNames.filter(n => !regionsRef.current[n]);
+    if (unloaded.length > 0) {
+      loadBatch(unloaded);
+    }
+  }, [loadBatch]);
 
   // Flatten all vinyls
   const allVinyls = React.useMemo(() => {
@@ -143,7 +158,6 @@ const App: React.FC = () => {
         externalId: data.externalId,
         lat: 40.7,
         lng: -74,
-        position: { x: 0, y: 0 },
         listenerCount: 1,
         genre: ['User Drop'],
         isPlaying: false,
@@ -168,31 +182,6 @@ const App: React.FC = () => {
     setSelectedVinyl(newVinyl);
   };
 
-  // Circadian refresh
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const loadedKeys = Object.keys(regionsRef.current).filter(
-        k => k !== 'user' && regionsRef.current[k].status === 'loaded'
-      );
-      if (loadedKeys.length === 0) return;
-
-      const randomKey = loadedKeys[Math.floor(Math.random() * loadedKeys.length)];
-      const region = REGIONS.find(r => r.name === randomKey);
-      if (!region) return;
-
-      fetchRegionalTracks(region.code, region.lat, region.lng, region.name)
-        .then(newVinyls => {
-          if (newVinyls.length === 0) return;
-          setRegions(prev => ({
-            ...prev,
-            [randomKey]: { id: randomKey, status: 'loaded', data: newVinyls }
-          }));
-        })
-        .catch(() => {});
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToTarget({ lat, lng });
@@ -210,9 +199,11 @@ const App: React.FC = () => {
       {!vortexMode && (
         <GlobeScene
           vinyls={allVinyls}
+          regions={regions}
           onVinylClick={handleVinylClick}
           audioUnlocked={audioUnlocked}
           flyToTarget={flyToTarget}
+          onVisibleRegionsChange={handleVisibleRegions}
         />
       )}
 
@@ -224,6 +215,8 @@ const App: React.FC = () => {
           <Hud
             onDropVinyl={() => setIsDropModalOpen(true)}
             onVortex={() => setVortexMode(true)}
+            onOpenCrate={() => setCrateOpen(true)}
+            crateCount={crateCount}
             myVinyl={myVinyl}
             vinylCount={allVinyls.length}
             regionCount={loadedRegionCount}
@@ -233,10 +226,16 @@ const App: React.FC = () => {
           <NowPlayingBar vinyls={allVinyls} />
           <ActivityTicker vinyls={allVinyls} />
 
+          <CratePanel
+            open={crateOpen}
+            onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
+            onSelectVinyl={handleVinylClick}
+          />
+
           {selectedVinyl && (
             <PlayerModal
               vinyl={selectedVinyl}
-              onClose={handleCloseModal}
+              onClose={() => { handleCloseModal(); setCrateCount(getCrate().length); }}
               onUpdate={handleVinylUpdate}
             />
           )}

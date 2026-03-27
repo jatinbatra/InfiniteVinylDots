@@ -1,34 +1,3 @@
-export const CANVAS_OPTS = {
-  MIN_SCALE: 0.2, // Allow zooming out further to see the whole world
-  MAX_SCALE: 4,
-  DOT_BASE_SIZE: 64,
-  DOT_HOVER_SIZE: 200,
-  DOT_ACTIVE_SIZE: 350,
-  BUFFER: 500, // Pixels to render outside viewport
-  FRICTION: 0.9,
-  CHUNK_SIZE: 2000, 
-};
-
-export const MAP_DIMENSIONS = {
-  width: 4000,
-  height: 2000,
-};
-
-export const MOCK_USER_ID = "current-user-123";
-
-// Placeholder images provided by picsum
-export const PLACEHOLDER_ART = "https://picsum.photos/300/300";
-
-// Search terms for generating diverse chunks
-export const MUSIC_TERMS = [
-  "Deep House", "Indie Rock", "Jazz", "Techno", "Ambient", 
-  "Hip Hop", "Soul", "Psychedelic", "Synthwave", "Classical",
-  "Funk", "Disco", "Reggae", "Blues", "Metal", "Pop", "R&B",
-  "Electronic", "Folk", "Punk", "Lo-Fi", "Dubstep"
-];
-
-export const GENRES = MUSIC_TERMS;
-
 // Music markets with coordinates — the more regions, the denser the globe
 export const REGIONS = [
   // Americas

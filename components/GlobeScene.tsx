@@ -5,16 +5,19 @@ import * as THREE from 'three';
 import Earth, { GLOBE_RADIUS } from './Earth';
 import Atmosphere from './Atmosphere';
 import VinylMarker3D from './VinylMarker3D';
-import { VinylRecord } from '../types';
+import { VinylRecord, Chunk } from '../types';
 import { getSunDirection, latLngToSphere } from '../utils/geoUtils';
 import { REGIONS } from '../constants';
+import { getCircadianMood } from '../services/circadianService';
 
 interface GlobeSceneProps {
   vinyls: VinylRecord[];
+  regions?: Record<string, Chunk>;
   onVinylClick: (vinyl: VinylRecord) => void;
   audioUnlocked: boolean;
   flyToTarget?: { lat: number; lng: number } | null;
   introActive?: boolean;
+  onVisibleRegionsChange?: (regionNames: string[]) => void;
 }
 
 // Sun-driven directional light
@@ -137,6 +140,71 @@ const CityLabels: React.FC = () => (
   </>
 );
 
+// Detect which regions are visible to the camera and report back
+const VisibleRegionDetector: React.FC<{ onChange: (names: string[]) => void }> = ({ onChange }) => {
+  const lastReportRef = useRef<string>('');
+  const throttleRef = useRef(0);
+
+  useFrame(({ camera, clock }) => {
+    // Throttle to every 500ms
+    const now = clock.getElapsedTime();
+    if (now - throttleRef.current < 0.5) return;
+    throttleRef.current = now;
+
+    const camDir = camera.position.clone().normalize();
+    const camDist = camera.position.length();
+    // Wider FOV when zoomed out, tighter when zoomed in
+    const dotThreshold = camDist > GLOBE_RADIUS * 3 ? 0.1 : 0.3;
+
+    const visible: string[] = [];
+    for (const region of REGIONS) {
+      const pos = latLngToSphere(region.lat, region.lng, GLOBE_RADIUS);
+      const regionDir = pos.clone().normalize();
+      if (regionDir.dot(camDir) > dotThreshold) {
+        visible.push(region.name);
+      }
+    }
+
+    const key = visible.sort().join(',');
+    if (key !== lastReportRef.current) {
+      lastReportRef.current = key;
+      onChange(visible);
+    }
+  });
+
+  return null;
+};
+
+// City heatmap glow — loaded cities glow based on track count
+const CityHeatmap: React.FC<{ regions: Record<string, Chunk> }> = ({ regions }) => {
+  const glowData = useMemo(() => {
+    return REGIONS.map(region => {
+      const chunk = regions[region.name];
+      const count = chunk?.status === 'loaded' ? chunk.data.length : 0;
+      const intensity = Math.min(1, count / 20);
+      const pos = latLngToSphere(region.lat, region.lng, GLOBE_RADIUS * 1.005);
+      const mood = getCircadianMood(region.lng);
+      return { name: region.name, pos, intensity, color: mood.color };
+    }).filter(d => d.intensity > 0);
+  }, [regions]);
+
+  return (
+    <>
+      {glowData.map(({ name, pos, intensity, color }) => (
+        <sprite key={name} position={[pos.x, pos.y, pos.z]} scale={[0.15 * intensity + 0.05, 0.15 * intensity + 0.05, 1]}>
+          <spriteMaterial
+            color={color}
+            transparent
+            opacity={intensity * 0.6}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </sprite>
+      ))}
+    </>
+  );
+};
+
 // Ambient floating particles around the globe
 const AmbientParticles: React.FC = () => {
   const ref = useRef<THREE.Points>(null);
@@ -200,11 +268,13 @@ const AmbientParticles: React.FC = () => {
 
 const GlobeContent: React.FC<{
   vinyls: VinylRecord[];
+  regions?: Record<string, Chunk>;
   onVinylClick: (vinyl: VinylRecord) => void;
   audioUnlocked: boolean;
   flyToTarget?: { lat: number; lng: number } | null;
   introActive?: boolean;
-}> = ({ vinyls, onVinylClick, audioUnlocked, flyToTarget, introActive }) => {
+  onVisibleRegionsChange?: (regionNames: string[]) => void;
+}> = ({ vinyls, regions, onVinylClick, audioUnlocked, flyToTarget, introActive, onVisibleRegionsChange }) => {
   const sunDir = useMemo(() => getSunDirection(), []);
 
   return (
@@ -228,6 +298,8 @@ const GlobeContent: React.FC<{
       <Earth />
       <Atmosphere sunDirection={sunDir} />
 
+      {regions && <CityHeatmap regions={regions} />}
+
       {vinyls.map(vinyl => (
         <VinylMarker3D
           key={vinyl.id}
@@ -238,6 +310,10 @@ const GlobeContent: React.FC<{
       ))}
 
       <CityLabels />
+
+      {onVisibleRegionsChange && (
+        <VisibleRegionDetector onChange={onVisibleRegionsChange} />
+      )}
 
       <OrbitControls
         enablePan={false}
@@ -254,7 +330,7 @@ const GlobeContent: React.FC<{
   );
 };
 
-const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, onVinylClick, audioUnlocked, flyToTarget, introActive }) => {
+const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, regions, onVinylClick, audioUnlocked, flyToTarget, introActive, onVisibleRegionsChange }) => {
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000005' }}>
       <Canvas
@@ -275,10 +351,12 @@ const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, onVinylClick, audioUnlo
         <Suspense fallback={null}>
           <GlobeContent
             vinyls={vinyls}
+            regions={regions}
             onVinylClick={onVinylClick}
             audioUnlocked={audioUnlocked}
             flyToTarget={flyToTarget}
             introActive={introActive}
+            onVisibleRegionsChange={onVisibleRegionsChange}
           />
         </Suspense>
       </Canvas>

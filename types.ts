@@ -1,8 +1,3 @@
-export interface Position {
-  x: number;
-  y: number;
-}
-
 export interface VinylRecord {
   id: string;
   albumId: string;
@@ -17,8 +12,6 @@ export interface VinylRecord {
   // Geographic position
   lat?: number;
   lng?: number;
-  position: Position; // legacy 2D position
-
   listenerCount: number;
   genre: string[];
   isPlaying: boolean;
@@ -36,18 +29,9 @@ export interface VinylRecord {
   // Circadian
   circadianColor?: string;
   circadianMood?: string;
-}
 
-export interface CanvasState {
-  offset: Position;
-  scale: number;
-}
-
-export interface Viewport {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
+  // Vinyl condition: 0 = dusty/unplayed, 1 = crystal clear
+  condition?: number;
 }
 
 export interface AlbumInsight {
