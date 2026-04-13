@@ -79,10 +79,6 @@ const TRIVIA = [
   (a: string) => `This release helped ${a} break into new markets.`,
 ];
 
-function localFallback(artist: string, album: string): AlbumInsight {
-  const h = simpleHash(`${artist}-${album}`);
-  return {
-    vibe: VIBES[h % VIBES.length],
-    trivia: TRIVIA[h % TRIVIA.length](artist),
-  };
+function localFallback(_artist: string, _album: string): AlbumInsight | null {
+  return null;
 }

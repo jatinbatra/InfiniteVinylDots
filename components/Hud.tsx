@@ -4,13 +4,15 @@ import { VinylRecord } from '../types';
 interface HudProps {
   onDropVinyl: () => void;
   onVortex?: () => void;
+  onOpenCrate?: () => void;
+  crateCount?: number;
   myVinyl?: VinylRecord;
   vinylCount?: number;
   regionCount?: number;
   totalRegions?: number;
 }
 
-const Hud: React.FC<HudProps> = ({ onDropVinyl, onVortex, myVinyl, vinylCount = 0 }) => {
+const Hud: React.FC<HudProps> = ({ onDropVinyl, onVortex, onOpenCrate, crateCount = 0, myVinyl, vinylCount = 0 }) => {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -58,6 +60,24 @@ const Hud: React.FC<HudProps> = ({ onDropVinyl, onVortex, myVinyl, vinylCount = 
             <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
           </svg>
         </button>
+
+        {/* Crate button */}
+        {onOpenCrate && (
+          <button
+            onClick={onOpenCrate}
+            className="relative w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center text-gold/70 hover:text-gold hover:bg-gold/10 hover:border-gold/30 transition-all"
+            title="The Crate"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+            {crateCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-gold text-black text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {crateCount > 99 ? '99+' : crateCount}
+              </span>
+            )}
+          </button>
+        )}
 
         {/* Vortex mode button */}
         {onVortex && (

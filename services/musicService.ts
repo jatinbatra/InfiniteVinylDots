@@ -1,4 +1,4 @@
-import { VinylRecord, Position } from '../types';
+import { VinylRecord } from '../types';
 import { getCircadianMood } from './circadianService';
 import { REGIONAL_GENRES } from '../constants';
 
@@ -10,6 +10,9 @@ class AudioManager {
   private currentUrl: string | null = null;
   private fadeInterval: any = null;
   private listeners: AudioListener[] = [];
+  private audioCtx: AudioContext | null = null;
+  private filterNode: BiquadFilterNode | null = null;
+  private sourceNode: MediaElementAudioSourceNode | null = null;
 
   get isPlaying(): boolean {
     return !!this.currentAudio && !this.currentAudio.paused;
@@ -28,7 +31,7 @@ class AudioManager {
     this.listeners.forEach(fn => fn(playing, url));
   }
 
-  play(url: string) {
+  play(url: string, condition?: number) {
     if (this.currentUrl === url && this.currentAudio && !this.currentAudio.paused) return;
     this.stop();
 
@@ -36,6 +39,11 @@ class AudioManager {
     this.currentAudio = new Audio(url);
     this.currentAudio.volume = 0;
     this.currentAudio.loop = true;
+
+    // Apply vinyl condition filter if condition is provided
+    if (condition !== undefined && condition < 1) {
+      this.applyConditionFilter(this.currentAudio, condition);
+    }
 
     // Notify immediately with the URL so UI can show it
     this.notify(true, url);
@@ -48,6 +56,30 @@ class AudioManager {
           console.warn("Audio play blocked:", error);
           this.notify(false, null);
         });
+    }
+  }
+
+  private applyConditionFilter(audio: HTMLAudioElement, condition: number) {
+    try {
+      if (!this.audioCtx) {
+        this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      this.sourceNode = this.audioCtx.createMediaElementSource(audio);
+      this.filterNode = this.audioCtx.createBiquadFilter();
+      this.filterNode.type = 'lowpass';
+      // condition 0 → 800Hz (very muffled), condition 1 → 20000Hz (clear)
+      this.filterNode.frequency.value = 800 + condition * 19200;
+      this.filterNode.Q.value = 0.7;
+      this.sourceNode.connect(this.filterNode);
+      this.filterNode.connect(this.audioCtx.destination);
+    } catch {
+      // Fallback: play without filter
+    }
+  }
+
+  updateCondition(condition: number) {
+    if (this.filterNode) {
+      this.filterNode.frequency.value = 800 + condition * 19200;
     }
   }
 
@@ -168,7 +200,6 @@ export const fetchRegionalTracks = async (
         sourceType: 'itunes' as const,
         lat: centerLat + (Math.sin(angle) * radius) / 111,
         lng: centerLng + (Math.cos(angle) * radius) / (111 * Math.cos(centerLat * Math.PI / 180)),
-        position: { x: 0, y: 0 },
         listenerCount: Math.floor(Math.random() * 1000) + 50,
         genre: [item.primaryGenreName || searchTerm],
         isPlaying: Math.random() > 0.4,
@@ -205,7 +236,6 @@ export const fetchTrackSearch = async (term: string): Promise<VinylRecord[]> => 
         sourceType: 'itunes' as const,
         lat: 0,
         lng: 0,
-        position: { x: 0, y: 0 },
         listenerCount: 1,
         genre: [item.primaryGenreName],
         isPlaying: true,
@@ -223,9 +253,3 @@ export const fetchTrackSearch = async (term: string): Promise<VinylRecord[]> => 
   }
 };
 
-// Keep for backward compat
-export const latLngToCanvas = (lat: number, lng: number): Position => {
-  const x = (lng / 180) * 2000;
-  const y = -(lat / 90) * 1000;
-  return { x, y };
-};

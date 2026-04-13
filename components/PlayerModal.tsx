@@ -3,6 +3,7 @@ import { VinylRecord, AlbumInsight } from '../types';
 import { getAlbumInsight } from '../services/geminiService';
 import { audioManager } from '../services/musicService';
 import { searchYouTubeVideo } from '../services/youtubeService';
+import { addToCrate, removeFromCrate, isInCrate, getCondition, improveCondition } from '../services/crateService';
 
 interface PlayerModalProps {
   vinyl: VinylRecord | null;
@@ -17,6 +18,9 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
   const [youtubeId, setYoutubeId] = useState<string | null>(null);
   const [isSearchingYT, setIsSearchingYT] = useState(false);
   const [showYouTube, setShowYouTube] = useState(false);
+  const [inCrate, setInCrate] = useState(false);
+  const [condition, setCondition] = useState(0.3);
+  const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -29,6 +33,8 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
     setIsLoadingInsight(true);
     setYoutubeId(null);
     setShowYouTube(false);
+    setInCrate(isInCrate(vinyl.id));
+    setCondition(getCondition(vinyl.id));
 
     getAlbumInsight(vinyl.artist, vinyl.title).then(data => {
       setInsight(data);
@@ -64,6 +70,19 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
       audio.pause();
     }
   }, [isPlaying, showYouTube]);
+
+  // Improve condition after 5s of playback
+  useEffect(() => {
+    if (playTimerRef.current) clearTimeout(playTimerRef.current);
+    if (isPlaying && vinyl) {
+      playTimerRef.current = setTimeout(() => {
+        const newCond = improveCondition(vinyl.id);
+        setCondition(newCond);
+        audioManager.updateCondition(newCond);
+      }, 5000);
+    }
+    return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
+  }, [isPlaying, vinyl]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -104,6 +123,16 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
 
   const handleFollowToggle = () => {
     onUpdate({ ...vinyl, isFollowed: !vinyl.isFollowed });
+  };
+
+  const handleCrateToggle = () => {
+    if (inCrate) {
+      removeFromCrate(vinyl.id);
+      setInCrate(false);
+    } else {
+      addToCrate(vinyl);
+      setInCrate(true);
+    }
   };
 
   const handlePlayFull = () => {
@@ -278,20 +307,38 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
                 )}
               </div>
 
-              {/* Like button */}
-              <button
-                onClick={handleLikeToggle}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
-                  vinyl.isLiked
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                    : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:border-zinc-500'
-                }`}
-              >
-                <svg className={`w-3 h-3 ${vinyl.isLiked ? 'fill-current' : 'fill-none stroke-current'}`} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                {vinyl.likes}
-              </button>
+              <div className="flex items-center gap-1.5">
+                {/* Crate button */}
+                <button
+                  onClick={handleCrateToggle}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
+                    inCrate
+                      ? 'bg-gold/20 text-gold border border-gold/40'
+                      : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:border-zinc-500'
+                  }`}
+                  title={inCrate ? 'Remove from Crate' : 'Save to Crate'}
+                >
+                  <svg className="w-3 h-3" fill={inCrate ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  {inCrate ? 'Saved' : 'Crate'}
+                </button>
+
+                {/* Like button */}
+                <button
+                  onClick={handleLikeToggle}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
+                    vinyl.isLiked
+                      ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                      : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:border-zinc-500'
+                  }`}
+                >
+                  <svg className={`w-3 h-3 ${vinyl.isLiked ? 'fill-current' : 'fill-none stroke-current'}`} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {vinyl.likes}
+                </button>
+              </div>
             </div>
 
             {/* Title & Artist */}
@@ -342,6 +389,23 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
               ) : (
                 <p className="text-zinc-600 text-xs">Insight unavailable</p>
               )}
+            </div>
+
+            {/* Vinyl Condition */}
+            <div className="flex items-center gap-3 px-1">
+              <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-bold whitespace-nowrap">Condition</span>
+              <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${condition * 100}%`,
+                    background: condition > 0.7 ? '#00D9FF' : condition > 0.4 ? '#FFD700' : '#666',
+                  }}
+                />
+              </div>
+              <span className="text-[9px] text-zinc-500 font-mono">
+                {condition >= 1 ? 'Mint' : condition >= 0.7 ? 'Clean' : condition >= 0.5 ? 'Good' : 'Dusty'}
+              </span>
             </div>
 
             {/* YouTube switch — if watching preview, offer full song */}
