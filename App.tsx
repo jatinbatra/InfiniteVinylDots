@@ -27,6 +27,7 @@ const App: React.FC = () => {
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
+  const fetchingRef = useRef<Set<string>>(new Set());
 
   // Unlock audio on first user interaction
   useEffect(() => {
@@ -50,9 +51,14 @@ const App: React.FC = () => {
   const loadBatch = useCallback(async (names: string[]) => {
     const toLoad = names
       .map(n => REGIONS.find(r => r.name === n))
-      .filter((r): r is typeof REGIONS[0] => !!r && !regionsRef.current[r.name]);
+      .filter((r): r is typeof REGIONS[0] =>
+        !!r && !regionsRef.current[r.name] && !fetchingRef.current.has(r.name)
+      );
 
     if (toLoad.length === 0) return;
+
+    // Guard against duplicate fetches
+    toLoad.forEach(r => fetchingRef.current.add(r.name));
 
     // Mark as loading
     setRegions(prev => {
@@ -66,6 +72,9 @@ const App: React.FC = () => {
     const results = await Promise.allSettled(
       toLoad.map(r => fetchRegionalTracks(r.code, r.lat, r.lng, r.name))
     );
+
+    // Clear fetching guard
+    toLoad.forEach(r => fetchingRef.current.delete(r.name));
 
     setRegions(prev => {
       const next = { ...prev };
