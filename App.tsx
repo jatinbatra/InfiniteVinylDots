@@ -8,8 +8,10 @@ import NowPlayingBar from './components/NowPlayingBar';
 import ActivityTicker from './components/ActivityTicker';
 import VinylVortex from './components/VinylVortex';
 import CratePanel from './components/CratePanel';
+import AutoPilotPanel from './components/AutoPilotPanel';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
 import { getCrate } from './services/crateService';
+import { useAutoPilot } from './hooks/useAutoPilot';
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
 
@@ -188,6 +190,23 @@ const App: React.FC = () => {
     setTimeout(() => setFlyToTarget(null), 3000);
   }, []);
 
+  // Auto-pilot discovery mode
+  const autoPilot = useAutoPilot(handleFlyTo);
+
+  const handleAutoPilotToggle = useCallback(() => {
+    if (autoPilot.active) {
+      autoPilot.stop();
+    } else {
+      autoPilot.start();
+    }
+  }, [autoPilot]);
+
+  // Stop auto-pilot when user manually clicks a vinyl
+  const handleVinylClickWithAutoPilotStop = useCallback((vinyl: VinylRecord) => {
+    if (autoPilot.active) autoPilot.stop();
+    handleVinylClick(vinyl);
+  }, [autoPilot, handleVinylClick]);
+
   const myVinyl = allVinyls.find(v => v.isOwner);
 
   return (
@@ -200,7 +219,7 @@ const App: React.FC = () => {
         <GlobeScene
           vinyls={allVinyls}
           regions={regions}
-          onVinylClick={handleVinylClick}
+          onVinylClick={handleVinylClickWithAutoPilotStop}
           audioUnlocked={audioUnlocked}
           flyToTarget={flyToTarget}
           onVisibleRegionsChange={handleVisibleRegions}
@@ -216,6 +235,8 @@ const App: React.FC = () => {
             onDropVinyl={() => setIsDropModalOpen(true)}
             onVortex={() => setVortexMode(true)}
             onOpenCrate={() => setCrateOpen(true)}
+            onAutoPilotToggle={handleAutoPilotToggle}
+            autoPilotActive={autoPilot.active}
             crateCount={crateCount}
             myVinyl={myVinyl}
             vinylCount={allVinyls.length}
@@ -225,6 +246,15 @@ const App: React.FC = () => {
 
           <NowPlayingBar vinyls={allVinyls} />
           <ActivityTicker vinyls={allVinyls} />
+
+          <AutoPilotPanel
+            active={autoPilot.active}
+            cityName={autoPilot.cityName}
+            djIntro={autoPilot.djIntro}
+            track={autoPilot.track}
+            moodColor={autoPilot.moodColor}
+            onTrackClick={handleVinylClickWithAutoPilotStop}
+          />
 
           <CratePanel
             open={crateOpen}
