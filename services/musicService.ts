@@ -231,7 +231,7 @@ export const fetchTrackSearch = async (term: string): Promise<VinylRecord[]> => 
         title: item.trackName,
         artist: item.artistName,
         year: new Date(item.releaseDate).getFullYear(),
-        coverUrl: item.artworkUrl100.replace('100x100', '600x600'),
+        coverUrl: item.artworkUrl100 ? item.artworkUrl100.replace('100x100', '600x600') : '',
         previewUrl: item.previewUrl,
         sourceType: 'itunes' as const,
         lat: 0,
