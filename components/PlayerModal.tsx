@@ -4,6 +4,7 @@ import { getAlbumInsight } from '../services/geminiService';
 import { audioManager } from '../services/musicService';
 import { searchYouTubeVideo } from '../services/youtubeService';
 import { addToCrate, removeFromCrate, isInCrate, getCondition, improveCondition } from '../services/crateService';
+import SharePostcard from './SharePostcard';
 
 interface PlayerModalProps {
   vinyl: VinylRecord | null;
@@ -20,6 +21,7 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
   const [showYouTube, setShowYouTube] = useState(false);
   const [inCrate, setInCrate] = useState(false);
   const [condition, setCondition] = useState(0.3);
+  const [showShare, setShowShare] = useState(false);
   const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -165,6 +167,17 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
       <div className="relative bg-zinc-950 border border-zinc-800/80 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
         style={{ animation: 'fadeZoomIn 0.25s ease-out' }}
       >
+        {/* Share button */}
+        <button
+          onClick={() => setShowShare(true)}
+          className="absolute top-3 right-12 z-20 text-white/40 hover:text-accent p-2 bg-black/60 rounded-full hover:bg-black/90 transition-colors"
+          title="Share this drop"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+        </button>
+
         {/* Close */}
         <button
           onClick={onClose}
@@ -467,6 +480,17 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
               </button>
             </div>
 
+            {/* Share This Drop */}
+            <button
+              onClick={() => setShowShare(true)}
+              className="w-full group flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-accent/5 hover:border-accent/20 transition-all text-zinc-500 hover:text-accent"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              <span className="text-xs font-bold uppercase tracking-wider">Share This Drop</span>
+            </button>
+
             {showYouTube && (
               <p className="text-center text-[9px] text-zinc-600 uppercase tracking-[0.15em]">
                 Full Song Playing via YouTube
@@ -483,6 +507,11 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
+
+      {/* Share postcard overlay */}
+      {showShare && (
+        <SharePostcard vinyl={vinyl} onClose={() => setShowShare(false)} />
+      )}
     </div>
   );
 };
