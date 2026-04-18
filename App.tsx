@@ -9,8 +9,11 @@ import ActivityTicker from './components/ActivityTicker';
 import VinylVortex from './components/VinylVortex';
 import CratePanel from './components/CratePanel';
 import AutoPilotPanel from './components/AutoPilotPanel';
+import WelcomeScreen from './components/WelcomeScreen';
+import WorldChart from './components/WorldChart';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
 import { getCrate } from './services/crateService';
+import { decodeShareParams, hasShareParams } from './services/shareService';
 import { useAutoPilot } from './hooks/useAutoPilot';
 import { VinylRecord, Chunk } from './types';
 import { REGIONS } from './constants';
@@ -24,6 +27,11 @@ const App: React.FC = () => {
   const [vortexMode, setVortexMode] = useState(false);
   const [crateOpen, setCrateOpen] = useState(false);
   const [crateCount, setCrateCount] = useState(() => getCrate().length);
+  const [chartOpen, setChartOpen] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+
+  // Detect deep-link on first render so WelcomeScreen can skip itself
+  const isDeepLink = hasShareParams();
 
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
@@ -45,6 +53,26 @@ const App: React.FC = () => {
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
+  }, []);
+
+  // Deep-link: parse ?t=…&a=… share params on mount, fly + open modal
+  useEffect(() => {
+    const shared = decodeShareParams();
+    if (!shared) return;
+
+    // Scrub params from URL so refreshes don't re-trigger
+    window.history.replaceState({}, '', window.location.pathname);
+
+    // Delay slightly so Three.js scene has time to mount its camera
+    const timer = setTimeout(() => {
+      if (shared.lat != null && shared.lng != null) {
+        setFlyToTarget({ lat: shared.lat, lng: shared.lng });
+        setTimeout(() => setFlyToTarget(null), 3000);
+      }
+      setSelectedVinyl(shared);
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Load a batch of regions by name
@@ -220,6 +248,14 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full font-sans text-white">
+      {/* First-visit welcome screen */}
+      {!welcomeDismissed && (
+        <WelcomeScreen
+          skipWelcome={isDeepLink}
+          onDismiss={() => setWelcomeDismissed(true)}
+        />
+      )}
+
       {/* Vortex mode — replaces globe */}
       {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
 
@@ -244,6 +280,7 @@ const App: React.FC = () => {
             onDropVinyl={() => setIsDropModalOpen(true)}
             onVortex={() => setVortexMode(true)}
             onOpenCrate={() => setCrateOpen(true)}
+            onOpenChart={() => setChartOpen(true)}
             onAutoPilotToggle={handleAutoPilotToggle}
             autoPilotActive={autoPilot.active}
             crateCount={crateCount}
@@ -269,6 +306,19 @@ const App: React.FC = () => {
             open={crateOpen}
             onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
             onSelectVinyl={handleVinylClick}
+          />
+
+          <WorldChart
+            open={chartOpen}
+            onClose={() => setChartOpen(false)}
+            regions={regions}
+            onFlyAndPlay={(vinyl) => {
+              if (autoPilot.active) autoPilot.stop();
+              if (vinyl.lat != null && vinyl.lng != null) {
+                handleFlyTo(vinyl.lat, vinyl.lng);
+              }
+              setSelectedVinyl(vinyl);
+            }}
           />
 
           {selectedVinyl && (
