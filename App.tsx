@@ -10,6 +10,7 @@ import VinylVortex from './components/VinylVortex';
 import CratePanel from './components/CratePanel';
 import AutoPilotPanel from './components/AutoPilotPanel';
 import WelcomeScreen from './components/WelcomeScreen';
+import WorldChart from './components/WorldChart';
 import { fetchRegionalTracks, fetchTrackSearch } from './services/musicService';
 import { getCrate } from './services/crateService';
 import { decodeShareParams, hasShareParams } from './services/shareService';
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const [vortexMode, setVortexMode] = useState(false);
   const [crateOpen, setCrateOpen] = useState(false);
   const [crateCount, setCrateCount] = useState(() => getCrate().length);
+  const [chartOpen, setChartOpen] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
 
   // Detect deep-link on first render so WelcomeScreen can skip itself
@@ -278,6 +280,7 @@ const App: React.FC = () => {
             onDropVinyl={() => setIsDropModalOpen(true)}
             onVortex={() => setVortexMode(true)}
             onOpenCrate={() => setCrateOpen(true)}
+            onOpenChart={() => setChartOpen(true)}
             onAutoPilotToggle={handleAutoPilotToggle}
             autoPilotActive={autoPilot.active}
             crateCount={crateCount}
@@ -303,6 +306,19 @@ const App: React.FC = () => {
             open={crateOpen}
             onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
             onSelectVinyl={handleVinylClick}
+          />
+
+          <WorldChart
+            open={chartOpen}
+            onClose={() => setChartOpen(false)}
+            regions={regions}
+            onFlyAndPlay={(vinyl) => {
+              if (autoPilot.active) autoPilot.stop();
+              if (vinyl.lat != null && vinyl.lng != null) {
+                handleFlyTo(vinyl.lat, vinyl.lng);
+              }
+              setSelectedVinyl(vinyl);
+            }}
           />
 
           {selectedVinyl && (
