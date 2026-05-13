@@ -172,7 +172,7 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
     // Glow pulse
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = hovered ? 0.35 : 0.12 + Math.sin(Date.now() * 0.002 + position.x * 5) * 0.06;
+      mat.opacity = hovered ? 0.6 : 0.15 + Math.sin(Date.now() * 0.002 + position.x * 5) * 0.08;
     }
   });
 
@@ -222,23 +222,32 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
 
       {/* Soft glow behind */}
       <mesh ref={glowRef} position={[0, 0, -0.001]}>
-        <circleGeometry args={[markerSize * 1.8, 24]} />
+        <circleGeometry args={[markerSize * 2.2, 24]} />
         <meshBasicMaterial
           color={vinylColor}
           transparent
-          opacity={0.12}
+          opacity={0.15}
           side={THREE.DoubleSide}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
-      {/* Owner ring */}
+      {/* Owner ring - making it glow more */}
       {vinyl.isOwner && (
         <mesh position={[0, 0, -0.0005]}>
-          <ringGeometry args={[markerSize * 1.1, markerSize * 1.4, 32]} />
-          <meshBasicMaterial color="#FFD700" transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} />
+          <ringGeometry args={[markerSize * 1.1, markerSize * 1.45, 32]} />
+          <meshBasicMaterial 
+            color="#FFD700" 
+            transparent 
+            opacity={0.8} 
+            side={THREE.DoubleSide} 
+            depthWrite={false} 
+            blending={THREE.AdditiveBlending}
+          />
         </mesh>
       )}
+
 
       {/* Tooltip */}
       {hovered && (

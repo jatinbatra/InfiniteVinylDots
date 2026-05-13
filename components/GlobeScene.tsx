@@ -1,6 +1,7 @@
 import React, { useRef, useMemo, useEffect, Suspense, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars, Html } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import Earth, { GLOBE_RADIUS } from './Earth';
 import Atmosphere from './Atmosphere';
@@ -34,7 +35,7 @@ const SunLight: React.FC = () => {
   return (
     <>
       <ambientLight intensity={0.15} />
-      <directionalLight ref={lightRef} intensity={0.4} color="#FFF5E1" />
+      <directionalLight ref={lightRef} intensity={0.6} color="#FFF5E1" />
     </>
   );
 };
@@ -195,7 +196,7 @@ const CityHeatmap: React.FC<{ regions: Record<string, Chunk> }> = ({ regions }) 
           <spriteMaterial
             color={color}
             transparent
-            opacity={intensity * 0.6}
+            opacity={intensity * 0.8}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -210,7 +211,7 @@ const AmbientParticles: React.FC = () => {
   const ref = useRef<THREE.Points>(null);
 
   const { positions, colors } = useMemo(() => {
-    const count = 200;
+    const count = 300;
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const palette = [
@@ -255,10 +256,10 @@ const AmbientParticles: React.FC = () => {
         />
       </bufferGeometry>
       <pointsMaterial
-        size={0.02}
+        size={0.025}
         vertexColors
         transparent
-        opacity={0.4}
+        opacity={0.6}
         sizeAttenuation
         depthWrite={false}
       />
@@ -286,8 +287,8 @@ const GlobeContent: React.FC<{
       <Stars
         radius={100}
         depth={60}
-        count={4000}
-        factor={3}
+        count={5000}
+        factor={4}
         saturation={0.15}
         fade
         speed={0.3}
@@ -326,6 +327,15 @@ const GlobeContent: React.FC<{
         autoRotate
         autoRotateSpeed={0.06}
       />
+
+      <EffectComposer multisampling={0}>
+        <Bloom 
+          intensity={1.2} 
+          luminanceThreshold={0.1} 
+          luminanceSmoothing={0.9} 
+          mipmapBlur 
+        />
+      </EffectComposer>
     </>
   );
 };
@@ -343,7 +353,8 @@ const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, regions, onVinylClick, 
         gl={{
           antialias: true,
           alpha: false,
-          powerPreference: 'high-performance'
+          powerPreference: 'high-performance',
+          toneMapping: THREE.ReinhardToneMapping,
         }}
         dpr={[1, 2]}
         style={{ width: '100%', height: '100%', touchAction: 'none' }}
@@ -365,3 +376,4 @@ const GlobeScene: React.FC<GlobeSceneProps> = ({ vinyls, regions, onVinylClick, 
 };
 
 export default GlobeScene;
+

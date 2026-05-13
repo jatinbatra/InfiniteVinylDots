@@ -1,31 +1,30 @@
 # VinylVerse
 
-> An infinite, collaborative music discovery playground where users explore a procedurally generated world of vinyl records, drop their favorite YouTube/Spotify tracks, and gather in real-time listening rooms.
+> An immersive, 3D music discovery playground where users explore a glowing holographic world of music, drop their favorite YouTube/Spotify tracks, and gather in real-time listening rooms.
 
 ## 📖 Documentation
 
-- **[VISUALIZATION.md](./VISUALIZATION.md)** - Comprehensive guide to what the application looks like, visual elements, UI components, and how to run it locally
+- **[VISUALIZATION.md](./VISUALIZATION.md)** - Comprehensive guide to the 3D environment, shaders, and visual architecture.
 
 ## Features
 
-- **Infinite Canvas**: Drag and scroll through an endless universe of music using a custom DOM-based engine.
-- **Living World Map**: Music is geolocated to real-world regions using iTunes charts, visualized on a sci-fi holographic map.
-- **Drop Your Vinyl**: Users can paste YouTube or Spotify links to place their own records on the map for others to find.
+- **Holographic 3D Globe**: Explore a high-performance Three.js Earth with dynamic atmosphere and city heatmaps.
+- **Cinematic Visuals**: Powered by UnrealBloom post-processing for a rich, glowing "cyber-vinyl" aesthetic.
+- **Living World Map**: Music is geolocated to real-world regions using iTunes charts, visualized as glowing 3D markers.
+- **Drop Your Vinyl**: Users can paste YouTube or Spotify links to place their own records on the globe for others to find.
 - **Social Listening**: Join listening rooms, "hype" tracks with reactions, follow artists, and chat with simulated listeners.
 - **AI Insights**: Powered by **Google Gemini** to generate instant "vibe checks" and trivia for every album.
-- **Interactive Player**: 
-  - **Hover**: Instant 30s previews for iTunes tracks.
-  - **Click**: Full player modal with embedded YouTube/Spotify playback and social controls.
 
 ## Tech Stack
 
 - **Frontend**: React 19, Tailwind CSS
-- **State Management**: React Hooks (Custom Infinite Canvas logic)
+- **3D Engine**: Three.js, @react-three/fiber, @react-three/drei
+- **Visuals**: GLSL Custom Shaders, @react-three/postprocessing (Bloom)
 - **APIs**: 
   - **Google Gemini** (AI Insights)
   - **iTunes Search API** (Global music data)
   - **Noembed** (YouTube/Spotify metadata parsing)
-- **Visuals**: SVG-based map projections, CSS3 hardware-accelerated animations.
+
 
 ## Quick Start
 
