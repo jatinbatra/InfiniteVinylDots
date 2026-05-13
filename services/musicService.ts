@@ -181,6 +181,12 @@ export const fetchRegionalTracks = async (
     const response = await fetch(
       `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&country=${regionCode}&entity=song&limit=20`
     );
+    
+    if (!response.ok) {
+      console.warn(`iTunes API returned ${response.status} for ${regionCode}`);
+      return [];
+    }
+
     const data: any = await response.json();
     if (!data.results) return [];
 

@@ -25,8 +25,7 @@ export const REGIONS = [
   { code: 'CL', lat: -33.4, lng: -70.6, name: 'Santiago' },
   { code: 'PE', lat: -12, lng: -77, name: 'Lima' },
   { code: 'JM', lat: 18, lng: -76.8, name: 'Kingston' },
-  { code: 'CU', lat: 23.1, lng: -82.4, name: 'Havana' },
-  { code: 'PR', lat: 18.5, lng: -66.1, name: 'San Juan' },
+  { code: 'US', lat: 18.5, lng: -66.1, name: 'San Juan' },
   { code: 'TT', lat: 10.7, lng: -61.5, name: 'Port of Spain' },
   // Europe
   { code: 'GB', lat: 51.5, lng: -0.1, name: 'London' },
