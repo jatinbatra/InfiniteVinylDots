@@ -11,262 +11,110 @@ interface HudProps {
   crateCount?: number;
   myVinyl?: VinylRecord;
   vinylCount?: number;
-  regionCount?: number;
-  totalRegions?: number;
+  quality?: 'low' | 'high';
+  onQualityToggle?: () => void;
 }
 
-const Hud: React.FC<HudProps> = ({ onDropVinyl, onVortex, onOpenCrate, onOpenChart, onAutoPilotToggle, autoPilotActive, crateCount = 0, myVinyl, vinylCount = 0 }) => {
+const Hud: React.FC<HudProps> = ({ 
+  onDropVinyl, onVortex, onOpenCrate, onOpenChart, onAutoPilotToggle, 
+  autoPilotActive, crateCount = 0, myVinyl, vinylCount = 0, 
+  quality = 'high', onQualityToggle 
+}) => {
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const check = () => {
-      const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const narrow = window.matchMedia('(max-width: 768px)').matches;
-      setIsMobile(touch && narrow);
-    };
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
 
   return (
     <>
-      {/* ================================================================ */}
-      {/*  TOP LEFT — Logo, minimal                                        */}
-      {/* ================================================================ */}
-      <div className="fixed top-5 left-5 z-50 flex items-center gap-3 select-none">
-        {/* Vinyl icon */}
-        <div className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center">
-          <div className="w-2 h-2 bg-white rounded-full" />
+      {/* Sleek Top Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 p-6 flex justify-between items-start pointer-events-none">
+        <div className="flex flex-col gap-1 pointer-events-auto">
+          <h1 className="text-white text-2xl font-bold tracking-tighter leading-none">VINYL<span className="text-cyan-400">VERSE</span></h1>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Live: {vinylCount.toLocaleString()} Tracks</span>
+          </div>
         </div>
-        <div>
-          <div className="text-white font-semibold text-base tracking-tight leading-none">
-            VinylVerse
-          </div>
-          <div className="text-[10px] text-zinc-600 font-medium mt-0.5">
-            {vinylCount.toLocaleString()} tracks worldwide
-          </div>
+
+        <div className="flex gap-3 pointer-events-auto">
+          <ActionButton onClick={onOpenChart} title="Global Charts">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+          </ActionButton>
+          
+          <ActionButton onClick={onOpenCrate} title="My Crate" badge={crateCount}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+          </ActionButton>
+
+          <button
+            onClick={onDropVinyl}
+            className="h-11 px-6 rounded-full bg-white text-black text-[11px] font-bold uppercase tracking-widest hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+          >
+            Drop Music
+          </button>
         </div>
       </div>
 
-      {/* ================================================================ */}
-      {/*  TOP RIGHT — Actions                                             */}
-      {/* ================================================================ */}
-      <div className="fixed top-5 right-5 z-50 flex items-center gap-2">
-        {/* About button */}
+      {/* Floating Discovery Controls */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-black/40 backdrop-blur-2xl border border-white/10 p-2 rounded-full shadow-2xl">
         <button
-          onClick={() => setAboutOpen(!aboutOpen)}
-          className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition-all"
+          onClick={onAutoPilotToggle}
+          className={`h-10 px-6 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
+            autoPilotActive ? 'bg-emerald-500 text-black' : 'text-white hover:bg-white/10'
+          }`}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
-          </svg>
+          {autoPilotActive ? 'Cancel Flight' : 'Auto-Pilot'}
         </button>
 
-        {/* Auto-Pilot toggle */}
-        {onAutoPilotToggle && (
-          <button
-            onClick={onAutoPilotToggle}
-            className={`relative h-9 rounded-full backdrop-blur-sm border flex items-center justify-center transition-all ${
-              autoPilotActive
-                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 px-3 gap-2'
-                : 'bg-white/5 border-white/10 text-emerald-400/70 hover:text-emerald-300 hover:bg-emerald-500/10 hover:border-emerald-500/30 w-9'
-            }`}
-            title={autoPilotActive ? 'Stop Discovery Flight' : 'Start Discovery Flight'}
-          >
-            {autoPilotActive ? (
-              <>
-                <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-wider">Live</span>
-              </>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-            )}
-          </button>
-        )}
+        <div className="w-px h-4 bg-white/10" />
 
-        {/* World Chart button */}
-        {onOpenChart && (
-          <button
-            onClick={onOpenChart}
-            className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center text-accent/60 hover:text-accent hover:bg-accent/10 hover:border-accent/30 transition-all"
-            title="World Chart"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.5h4v7H3v-7zm7-6h4v13h-4V7.5zm7-4.5h4v18h-4V3z" />
-            </svg>
-          </button>
-        )}
-
-        {/* Crate button */}
-        {onOpenCrate && (
-          <button
-            onClick={onOpenCrate}
-            className="relative w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center text-gold/70 hover:text-gold hover:bg-gold/10 hover:border-gold/30 transition-all"
-            title="The Crate"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            {crateCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-gold text-black text-[8px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                {crateCount > 99 ? '99+' : crateCount}
-              </span>
-            )}
-          </button>
-        )}
-
-        {/* Vortex mode button */}
-        {onVortex && (
-          <button
-            onClick={onVortex}
-            className="w-9 h-9 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 flex items-center justify-center text-cyan-400/70 hover:text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-all"
-            title="Turntable God Mode"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v4M12 18v4" />
-            </svg>
-          </button>
-        )}
-
-        {/* Drop vinyl button */}
         <button
-          onClick={onDropVinyl}
-          className="h-9 px-4 rounded-full bg-white text-black text-xs font-semibold flex items-center gap-2 hover:bg-zinc-200 active:scale-95 transition-all"
+            onClick={onQualityToggle}
+            className="w-10 h-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-cyan-400 transition-colors"
+            title="Toggle Visual Quality"
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Add Music
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </button>
+
+        <button
+          onClick={() => setAboutOpen(true)}
+          className="w-10 h-10 flex items-center justify-center rounded-full text-zinc-500 hover:text-white transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" /></svg>
         </button>
       </div>
 
-      {/* ================================================================ */}
-      {/*  ABOUT PANEL — Clean overlay                                     */}
-      {/* ================================================================ */}
+      {/* About Modal */}
       {aboutOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAboutOpen(false)} />
-          <div className="relative bg-zinc-950 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
-            <button
-              onClick={() => setAboutOpen(false)}
-              className="absolute top-4 right-4 text-zinc-600 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            <div>
-              <h2 className="text-white text-lg font-semibold">VinylVerse</h2>
-              <p className="text-zinc-500 text-sm mt-1">Hear what the world is listening to.</p>
-            </div>
-
-            <p className="text-sm text-zinc-400 leading-relaxed">
-              Spin the globe and discover music from 100+ cities.
-              Lagos plays afrobeats. Tokyo plays city pop. Berlin plays techno.
-              Each region sounds like itself — and the vibe changes with the time of day.
-            </p>
-
-            <p className="text-sm text-zinc-500 leading-relaxed">
-              Music is the most universal thing we have, but algorithms trap us in bubbles.
-              I wanted to build something where you could just point at a place on Earth
-              and hear what's actually playing there.
-            </p>
-
-            <div className="border-t border-zinc-800 pt-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-xs font-bold text-white">JB</div>
-                <div>
-                  <div className="text-white text-sm font-semibold">Jatin Batra</div>
-                  <div className="text-xs text-zinc-600">Builder</div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-md bg-black/60">
+            <div className="bg-zinc-950 border border-white/10 p-8 rounded-3xl max-w-lg w-full relative">
+                <button onClick={() => setAboutOpen(false)} className="absolute top-6 right-6 text-zinc-500 hover:text-white">✕</button>
+                <h2 className="text-white text-3xl font-bold tracking-tighter mb-4">VINYLVERSE</h2>
+                <p className="text-zinc-400 leading-relaxed mb-6">Step into a massive, 3D music discovery ecosystem. Explore tracks geolocated across 100+ global markets in real-time.</p>
+                <div className="flex items-center gap-4 border-t border-white/5 pt-6">
+                    <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center font-bold">JB</div>
+                    <div>
+                        <div className="text-white font-bold">Jatin Batra</div>
+                        <div className="text-zinc-600 text-xs">Architect & Visionary</div>
+                    </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <a
-                  href="https://x.com/jatinbatra_"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-zinc-500 hover:text-white transition-colors flex items-center gap-1.5"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  @jatinbatra_
-                </a>
-                <a
-                  href="https://github.com/jatinbatra"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-zinc-500 hover:text-white transition-colors flex items-center gap-1.5"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                  GitHub
-                </a>
-              </div>
             </div>
-
-            <div className="text-[10px] text-zinc-700 pt-2 border-t border-zinc-900">
-              React + Three.js + iTunes API
-            </div>
-          </div>
         </div>
       )}
-
-      {/* ================================================================ */}
-      {/*  BOTTOM LEFT — Now Playing (your vinyl)                          */}
-      {/* ================================================================ */}
-      {myVinyl && (
-        <div className="fixed bottom-5 left-5 z-50">
-          <div className="bg-zinc-950/90 backdrop-blur-xl border border-zinc-800 rounded-xl p-3 flex items-center gap-3 max-w-xs">
-            <img
-              src={myVinyl.coverUrl}
-              className="w-10 h-10 rounded-lg object-cover"
-              alt=""
-            />
-            <div className="min-w-0">
-              <div className="text-[9px] text-zinc-500 uppercase font-semibold tracking-wider">Your Vinyl</div>
-              <div className="text-sm text-white truncate font-medium">{myVinyl.title}</div>
-              <div className="text-[10px] text-zinc-500 truncate">{myVinyl.artist}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================================================================ */}
-      {/*  BOTTOM CENTER — Hint (auto-hides)                               */}
-      {/* ================================================================ */}
-      <HintBar isMobile={isMobile} />
     </>
   );
 };
 
-const HintBar: React.FC<{ isMobile: boolean }> = ({ isMobile }) => {
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(false), 6000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (!visible) return null;
-
-  return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 transition-opacity duration-500" style={{ opacity: visible ? 1 : 0 }}>
-      <div className="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800/50 rounded-full px-4 py-2">
-        <p className="text-[11px] text-zinc-500 font-medium whitespace-nowrap">
-          {isMobile ? (
-            <>Swipe to rotate &middot; Pinch to zoom &middot; Tap a dot to listen</>
-          ) : (
-            <>Drag to rotate &middot; Scroll to zoom &middot; Hover a dot to preview &middot; Click to open</>
-          )}
-        </p>
-      </div>
-    </div>
-  );
-};
+const ActionButton: React.FC<{ onClick?: () => void; children: React.ReactNode; title: string; badge?: number }> = ({ onClick, children, title, badge }) => (
+  <button
+    onClick={onClick}
+    className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-zinc-400 hover:text-cyan-400 hover:border-cyan-400/50 transition-all relative group shadow-xl"
+    title={title}
+  >
+    {children}
+    {badge ? (
+      <span className="absolute -top-1 -right-1 bg-cyan-500 text-black text-[9px] font-black rounded-full w-4 h-4 flex items-center justify-center shadow-lg">
+        {badge}
+      </span>
+    ) : null}
+  </button>
+);
 
 export default Hud;

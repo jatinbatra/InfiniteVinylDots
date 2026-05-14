@@ -11,15 +11,11 @@ interface VinylMarker3DProps {
   vinyl: VinylRecord;
   onClick: (vinyl: VinylRecord) => void;
   audioUnlocked: boolean;
+  uBass?: number;
 }
 
-// Texture cache — avoids recreating identical textures
 const textureCache = new Map<string, THREE.CanvasTexture>();
 
-/**
- * Creates a bright, visible circular texture.
- * Draws album art as a circle when loaded, falls back to a glowing colored dot.
- */
 function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasTexture {
   const cacheKey = `${coverUrl || color}`;
   if (textureCache.has(cacheKey)) return textureCache.get(cacheKey)!;
@@ -32,7 +28,6 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
   const cx = size / 2;
   const r = cx - 4;
 
-  // Draw bright colored circle as default
   ctx.beginPath();
   ctx.arc(cx, cx, r, 0, Math.PI * 2);
   const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, r);
@@ -42,14 +37,12 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Outer glow ring
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.6;
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  // Center dot (vinyl spindle look)
   ctx.beginPath();
   ctx.arc(cx, cx, 4, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -59,27 +52,17 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
   tex.needsUpdate = true;
   textureCache.set(cacheKey, tex);
 
-  // Load album art asynchronously and repaint
   if (coverUrl) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onerror = () => {
-      // Keep the colored dot fallback — no action needed
-    };
     img.onload = () => {
       ctx.clearRect(0, 0, size, size);
-
-      // Clip to circle
       ctx.save();
       ctx.beginPath();
       ctx.arc(cx, cx, r, 0, Math.PI * 2);
       ctx.clip();
-
-      // Draw album art
       ctx.drawImage(img, 0, 0, size, size);
       ctx.restore();
-
-      // Colored ring border
       ctx.beginPath();
       ctx.arc(cx, cx, r, 0, Math.PI * 2);
       ctx.strokeStyle = color;
@@ -87,8 +70,6 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
       ctx.globalAlpha = 0.8;
       ctx.stroke();
       ctx.globalAlpha = 1;
-
-      // Center hole
       ctx.beginPath();
       ctx.arc(cx, cx, 5, 0, Math.PI * 2);
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
@@ -96,13 +77,10 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
       ctx.strokeStyle = 'rgba(255,255,255,0.15)';
       ctx.lineWidth = 1;
       ctx.stroke();
-
       tex.needsUpdate = true;
     };
-    // Use smaller image for texture (60x60 is plenty for a dot)
     img.src = coverUrl.replace('600x600', '60x60');
   }
-
   return tex;
 }
 
@@ -122,7 +100,7 @@ function darken(hex: string, amt: number): string {
   return `rgb(${r},${g},${b})`;
 }
 
-const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlocked }) => {
+const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlocked, uBass = 0 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const discRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
@@ -130,11 +108,8 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinAngle = useRef(Math.random() * Math.PI * 2);
 
-  // Cleanup hover timeout on unmount
   useEffect(() => {
-    return () => {
-      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    };
+    return () => { if (hoverTimeout.current) clearTimeout(hoverTimeout.current); };
   }, []);
 
   const position = useMemo(() => {
@@ -145,7 +120,6 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   const vinylColor = vinyl.circadianColor || '#00D9FF';
   const texture = useMemo(() => createMarkerTexture(vinylColor, vinyl.coverUrl), [vinylColor, vinyl.coverUrl]);
 
-  // Orient disc to face outward from globe
   const quaternion = useMemo(() => {
     const q = new THREE.Quaternion();
     q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
@@ -157,22 +131,20 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
-    // Scale
-    const targetScale = hovered ? 1.8 : 1;
+    const targetScale = hovered ? 1.8 : (1.0 + uBass * 0.15);
     const s = groupRef.current.scale.x;
     groupRef.current.scale.setScalar(THREE.MathUtils.lerp(s, targetScale, 0.12));
 
-    // Spin
     if (discRef.current) {
-      const speed = hovered ? 4 : (vinyl.isPlaying ? 1.5 : 0.2);
+      const speed = hovered ? 4 : (vinyl.isPlaying ? (1.5 + uBass * 5.0) : 0.2);
       spinAngle.current += delta * speed;
       discRef.current.rotation.z = spinAngle.current;
     }
 
-    // Glow pulse
     if (glowRef.current) {
       const mat = glowRef.current.material as THREE.MeshBasicMaterial;
-      mat.opacity = hovered ? 0.6 : 0.15 + Math.sin(Date.now() * 0.002 + position.x * 5) * 0.08;
+      const baseOpacity = hovered ? 0.6 : 0.15;
+      mat.opacity = baseOpacity + Math.sin(Date.now() * 0.002 + position.x * 5) * 0.08 + uBass * 0.4;
     }
   });
 
@@ -203,75 +175,32 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
 
   return (
     <group position={position} quaternion={quaternion} ref={groupRef}>
-      {/* Album art disc */}
-      <mesh
-        ref={discRef}
-        onPointerOver={handlePointerOver}
-        onPointerOut={handlePointerOut}
-        onClick={handleClick}
-      >
+      <mesh ref={discRef} onPointerOver={handlePointerOver} onPointerOut={handlePointerOut} onClick={handleClick}>
         <circleGeometry args={[markerSize, 32]} />
-        <meshBasicMaterial
-          map={texture}
-          transparent
-          opacity={hovered ? 1 : 0.95}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
+        <meshBasicMaterial map={texture} transparent opacity={hovered ? 1 : 0.95} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      {/* Soft glow behind */}
       <mesh ref={glowRef} position={[0, 0, -0.001]}>
         <circleGeometry args={[markerSize * 2.2, 24]} />
-        <meshBasicMaterial
-          color={vinylColor}
-          transparent
-          opacity={0.15}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
+        <meshBasicMaterial color={vinylColor} transparent opacity={0.15} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
 
-      {/* Owner ring - making it glow more */}
       {vinyl.isOwner && (
         <mesh position={[0, 0, -0.0005]}>
           <ringGeometry args={[markerSize * 1.1, markerSize * 1.45, 32]} />
-          <meshBasicMaterial 
-            color="#FFD700" 
-            transparent 
-            opacity={0.8} 
-            side={THREE.DoubleSide} 
-            depthWrite={false} 
-            blending={THREE.AdditiveBlending}
-          />
+          <meshBasicMaterial color="#FFD700" transparent opacity={0.8} side={THREE.DoubleSide} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       )}
 
-
-      {/* Tooltip */}
       {hovered && (
-        <Html
-          position={[0, markerSize * 3.5, 0]}
-          center
-          style={{ pointerEvents: 'none', transform: 'translate(-50%, -100%)' }}
-          distanceFactor={2.5}
-        >
+        <Html position={[0, markerSize * 3.5, 0]} center style={{ pointerEvents: 'none', transform: 'translate(-50%, -100%)' }} distanceFactor={2.5}>
           <div className="bg-black/90 backdrop-blur-xl border border-white/10 px-3 py-2.5 rounded-xl shadow-2xl flex items-center gap-3 whitespace-nowrap">
             {vinyl.coverUrl && (
-              <img
-                src={vinyl.coverUrl.replace('600x600', '100x100')}
-                alt=""
-                className="w-11 h-11 rounded-lg object-cover flex-shrink-0 shadow-lg"
-              />
+              <img src={vinyl.coverUrl.replace('600x600', '100x100')} alt="" className="w-11 h-11 rounded-lg object-cover flex-shrink-0 shadow-lg" />
             )}
             <div className="min-w-0 pr-1">
-              <div className="text-white font-semibold text-[13px] leading-tight truncate max-w-[180px]">
-                {vinyl.title}
-              </div>
-              <div className="text-zinc-400 text-[11px] truncate max-w-[180px] mt-0.5">
-                {vinyl.artist}
-              </div>
+              <div className="text-white font-semibold text-[13px] leading-tight truncate max-w-[180px]">{vinyl.title}</div>
+              <div className="text-zinc-400 text-[11px] truncate max-w-[180px] mt-0.5">{vinyl.artist}</div>
               <div className="text-zinc-600 text-[10px] mt-0.5 flex items-center gap-1.5">
                 {vinyl.genre?.[0] && <span>{vinyl.genre[0]}</span>}
                 {vinyl.previewUrl && audioUnlocked && (

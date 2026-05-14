@@ -29,18 +29,15 @@ const App: React.FC = () => {
   const [crateCount, setCrateCount] = useState(() => getCrate().length);
   const [chartOpen, setChartOpen] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [graphicsQuality, setGraphicsQuality] = useState<'low' | 'high'>('high');
 
-  // Detect deep-link on first render so WelcomeScreen can skip itself
   const isDeepLink = hasShareParams();
-
   const regionsRef = useRef(regions);
   regionsRef.current = regions;
   const fetchingRef = useRef<Set<string>>(new Set());
 
-  // Unlock audio on first user interaction
   useEffect(() => {
     const unlock = () => {
-      // Resume the AudioContext so browsers actually allow playback
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       ctx.resume().catch(() => {});
       setAudioUnlocked(true);
@@ -55,15 +52,10 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Deep-link: parse ?t=…&a=… share params on mount, fly + open modal
   useEffect(() => {
     const shared = decodeShareParams();
     if (!shared) return;
-
-    // Scrub params from URL so refreshes don't re-trigger
     window.history.replaceState({}, '', window.location.pathname);
-
-    // Delay slightly so Three.js scene has time to mount its camera
     const timer = setTimeout(() => {
       if (shared.lat != null && shared.lng != null) {
         setFlyToTarget({ lat: shared.lat, lng: shared.lng });
@@ -71,11 +63,9 @@ const App: React.FC = () => {
       }
       setSelectedVinyl(shared);
     }, 800);
-
     return () => clearTimeout(timer);
   }, []);
 
-  // Load a batch of regions by name
   const loadBatch = useCallback(async (names: string[]) => {
     const toLoad = names
       .map(n => REGIONS.find(r => r.name === n))
@@ -84,11 +74,8 @@ const App: React.FC = () => {
       );
 
     if (toLoad.length === 0) return;
-
-    // Guard against duplicate fetches
     toLoad.forEach(r => fetchingRef.current.add(r.name));
 
-    // Mark as loading
     setRegions(prev => {
       const next = { ...prev };
       toLoad.forEach(r => {
@@ -101,7 +88,6 @@ const App: React.FC = () => {
       toLoad.map(r => fetchRegionalTracks(r.code, r.lat, r.lng, r.name))
     );
 
-    // Clear fetching guard
     toLoad.forEach(r => fetchingRef.current.delete(r.name));
 
     setRegions(prev => {
@@ -118,12 +104,10 @@ const App: React.FC = () => {
     });
   }, []);
 
-  // Wave 1: Load first 10 cities on mount so globe isn't empty
   useEffect(() => {
     loadBatch(REGIONS.slice(0, 10).map(r => r.name));
   }, [loadBatch]);
 
-  // Lazy load: fetch regions as camera reveals them
   const handleVisibleRegions = useCallback((regionNames: string[]) => {
     const unloaded = regionNames.filter(n => !regionsRef.current[n]);
     if (unloaded.length > 0) {
@@ -131,7 +115,6 @@ const App: React.FC = () => {
     }
   }, [loadBatch]);
 
-  // Flatten all vinyls
   const allVinyls = React.useMemo(() => {
     return Object.values(regions).flatMap((region: Chunk) => region.data);
   }, [regions]);
@@ -175,70 +158,40 @@ const App: React.FC = () => {
     searchTerm?: string;
   }) => {
     setIsDropModalOpen(false);
-
     let newVinyl: VinylRecord;
-
     if (data.searchTerm) {
       const tracks = await fetchTrackSearch(data.searchTerm);
       if (tracks.length > 0) {
         newVinyl = { ...tracks[0], lat: 40, lng: -74, isOwner: true };
-      } else {
-        return;
-      }
+      } else { return; }
     } else {
       newVinyl = {
         id: `custom-${Date.now()}`,
         albumId: `ext-${Date.now()}`,
-        title: data.title,
-        artist: data.artist,
-        year: new Date().getFullYear(),
-        coverUrl: data.coverUrl,
-        sourceType: data.sourceType,
-        externalId: data.externalId,
-        lat: 40.7,
-        lng: -74,
-        listenerCount: 1,
-        genre: ['User Drop'],
-        isPlaying: false,
-        isOwner: true,
-        likes: 0,
-        isLiked: false,
-        isJoined: true,
-        isFollowed: true,
-        circadianColor: '#FFD700',
-        circadianMood: 'Your Pick',
+        title: data.title, artist: data.artist, year: new Date().getFullYear(),
+        coverUrl: data.coverUrl, sourceType: data.sourceType, externalId: data.externalId,
+        lat: 40.7, lng: -74, listenerCount: 1, genre: ['User Drop'], isPlaying: false, isOwner: true,
+        likes: 0, isLiked: false, isJoined: true, isFollowed: true, circadianColor: '#FFD700', circadianMood: 'Your Pick',
       };
     }
-
     setRegions(prev => {
       const userRegion = prev['user'] || { id: 'user', status: 'loaded', data: [] };
-      return {
-        ...prev,
-        user: { ...userRegion, data: [...userRegion.data, newVinyl] }
-      };
+      return { ...prev, user: { ...userRegion, data: [...userRegion.data, newVinyl] } };
     });
-
     setSelectedVinyl(newVinyl);
   };
-
 
   const handleFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToTarget({ lat, lng });
     setTimeout(() => setFlyToTarget(null), 3000);
   }, []);
 
-  // Auto-pilot discovery mode
   const autoPilot = useAutoPilot(handleFlyTo);
 
   const handleAutoPilotToggle = useCallback(() => {
-    if (autoPilot.active) {
-      autoPilot.stop();
-    } else {
-      autoPilot.start();
-    }
+    if (autoPilot.active) { autoPilot.stop(); } else { autoPilot.start(); }
   }, [autoPilot]);
 
-  // Stop auto-pilot when user manually clicks a vinyl
   const handleVinylClickWithAutoPilotStop = useCallback((vinyl: VinylRecord) => {
     if (autoPilot.active) autoPilot.stop();
     handleVinylClick(vinyl);
@@ -248,34 +201,23 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full font-sans text-white">
-      {/* First-visit welcome screen */}
       {!welcomeDismissed && (
-        <WelcomeScreen
-          skipWelcome={isDeepLink}
-          onDismiss={() => setWelcomeDismissed(true)}
-        />
+        <WelcomeScreen skipWelcome={isDeepLink} onDismiss={() => setWelcomeDismissed(true)} />
       )}
 
-      {/* Vortex mode — replaces globe */}
       {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
 
-      {/* 3D Globe — shows immediately, dots appear as they load */}
       {!vortexMode && (
         <GlobeScene
-          vinyls={allVinyls}
-          regions={regions}
-          onVinylClick={handleVinylClickWithAutoPilotStop}
-          audioUnlocked={audioUnlocked}
-          flyToTarget={flyToTarget}
-          onVisibleRegionsChange={handleVisibleRegions}
+          vinyls={allVinyls} regions={regions} onVinylClick={handleVinylClickWithAutoPilotStop}
+          audioUnlocked={audioUnlocked} flyToTarget={flyToTarget} onVisibleRegionsChange={handleVisibleRegions}
+          quality={graphicsQuality}
         />
       )}
 
-      {/* UI — always visible (unless vortex) */}
       {!vortexMode && (
         <>
           <SearchBar onFlyTo={handleFlyTo} />
-
           <Hud
             onDropVinyl={() => setIsDropModalOpen(true)}
             onVortex={() => setVortexMode(true)}
@@ -288,52 +230,32 @@ const App: React.FC = () => {
             vinylCount={allVinyls.length}
             regionCount={loadedRegionCount}
             totalRegions={REGIONS.length}
+            quality={graphicsQuality}
+            onQualityToggle={() => setGraphicsQuality(q => q === 'high' ? 'low' : 'high')}
           />
-
           <NowPlayingBar vinyls={allVinyls} />
           <ActivityTicker vinyls={allVinyls} />
-
           <AutoPilotPanel
-            active={autoPilot.active}
-            cityName={autoPilot.cityName}
-            djIntro={autoPilot.djIntro}
-            track={autoPilot.track}
-            moodColor={autoPilot.moodColor}
-            onTrackClick={handleVinylClickWithAutoPilotStop}
+            active={autoPilot.active} cityName={autoPilot.cityName} djIntro={autoPilot.djIntro}
+            track={autoPilot.track} moodColor={autoPilot.moodColor} onTrackClick={handleVinylClickWithAutoPilotStop}
           />
-
           <CratePanel
-            open={crateOpen}
-            onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
+            open={crateOpen} onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
             onSelectVinyl={handleVinylClick}
           />
-
           <WorldChart
-            open={chartOpen}
-            onClose={() => setChartOpen(false)}
-            regions={regions}
+            open={chartOpen} onClose={() => setChartOpen(false)} regions={regions}
             onFlyAndPlay={(vinyl) => {
               if (autoPilot.active) autoPilot.stop();
-              if (vinyl.lat != null && vinyl.lng != null) {
-                handleFlyTo(vinyl.lat, vinyl.lng);
-              }
+              if (vinyl.lat != null && vinyl.lng != null) { handleFlyTo(vinyl.lat, vinyl.lng); }
               setSelectedVinyl(vinyl);
             }}
           />
-
           {selectedVinyl && (
-            <PlayerModal
-              vinyl={selectedVinyl}
-              onClose={() => { handleCloseModal(); setCrateCount(getCrate().length); }}
-              onUpdate={handleVinylUpdate}
-            />
+            <PlayerModal vinyl={selectedVinyl} onClose={() => { handleCloseModal(); setCrateCount(getCrate().length); }} onUpdate={handleVinylUpdate} />
           )}
-
           {isDropModalOpen && (
-            <DropModal
-              onClose={() => setIsDropModalOpen(false)}
-              onSubmit={handleDropSubmit}
-            />
+            <DropModal onClose={() => setIsDropModalOpen(false)} onSubmit={handleDropSubmit} />
           )}
         </>
       )}

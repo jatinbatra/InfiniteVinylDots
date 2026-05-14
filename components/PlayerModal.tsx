@@ -27,10 +27,7 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
 
   useEffect(() => {
     if (!vinyl) return;
-
-    // Stop any ambient hover preview
     audioManager.stop();
-
     setInsight(null);
     setIsLoadingInsight(true);
     setYoutubeId(null);
@@ -43,7 +40,6 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
       setIsLoadingInsight(false);
     });
 
-    // Search YouTube for full song
     if (vinyl.sourceType === 'youtube' && vinyl.externalId) {
       setYoutubeId(vinyl.externalId);
     } else {
@@ -54,7 +50,6 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
       });
     }
 
-    // Start iTunes preview for background while YT loads
     if (vinyl.previewUrl && vinyl.sourceType !== 'youtube' && vinyl.sourceType !== 'spotify') {
       setIsPlaying(true);
     } else {
@@ -62,7 +57,6 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
     }
   }, [vinyl]);
 
-  // Control audio element
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -73,447 +67,133 @@ const PlayerModal: React.FC<PlayerModalProps> = ({ vinyl, onClose, onUpdate }) =
     }
   }, [isPlaying, showYouTube]);
 
-  // Improve condition after 5s of playback
   useEffect(() => {
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
     if (isPlaying && vinyl) {
       playTimerRef.current = setTimeout(() => {
         const newCond = improveCondition(vinyl.id);
         setCondition(newCond);
-        audioManager.updateCondition(newCond);
       }, 5000);
     }
     return () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); };
   }, [isPlaying, vinyl]);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
   if (!vinyl) return null;
 
-  const handleJoinToggle = () => {
-    onUpdate({
-      ...vinyl,
-      isJoined: !vinyl.isJoined,
-      listenerCount: vinyl.listenerCount + (vinyl.isJoined ? -1 : 1)
-    });
-  };
-
-  const handleLikeToggle = () => {
-    onUpdate({
-      ...vinyl,
-      isLiked: !vinyl.isLiked,
-      likes: vinyl.likes + (vinyl.isLiked ? -1 : 1)
-    });
-  };
-
-  const handleFollowToggle = () => {
-    onUpdate({ ...vinyl, isFollowed: !vinyl.isFollowed });
-  };
-
   const handleCrateToggle = () => {
-    if (inCrate) {
-      removeFromCrate(vinyl.id);
-      setInCrate(false);
-    } else {
-      addToCrate(vinyl);
-      setInCrate(true);
-    }
+    if (inCrate) { removeFromCrate(vinyl.id); setInCrate(false); } 
+    else { addToCrate(vinyl); setInCrate(true); }
   };
-
-  const handlePlayFull = () => {
-    setShowYouTube(true);
-    setIsPlaying(false); // Stop preview
-    if (audioRef.current) audioRef.current.pause();
-  };
-
-  const listenerAvatars = [
-    vinyl.ownerAvatar,
-    `https://i.pravatar.cc/150?u=${vinyl.id}1`,
-    `https://i.pravatar.cc/150?u=${vinyl.id}2`,
-    `https://i.pravatar.cc/150?u=${vinyl.id}3`
-  ].filter(Boolean);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
-      {/* Audio element for iTunes preview */}
-      {vinyl.previewUrl && (
-        <audio ref={audioRef} src={vinyl.previewUrl} loop />
-      )}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-12">
+      {vinyl.previewUrl && <audio ref={audioRef} src={vinyl.previewUrl} loop />}
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose} />
 
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/90 backdrop-blur-lg"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-zinc-950 border border-zinc-800/80 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
-        style={{ animation: 'fadeZoomIn 0.25s ease-out' }}
-      >
-        {/* Share button */}
-        <button
-          onClick={() => setShowShare(true)}
-          className="absolute top-3 right-12 z-20 text-white/40 hover:text-accent p-2 bg-black/60 rounded-full hover:bg-black/90 transition-colors"
-          title="Share this drop"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-          </svg>
-        </button>
-
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 z-20 text-white/40 hover:text-white p-2 bg-black/60 rounded-full hover:bg-black/90 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+      <div className="relative bg-[#0a0a0c] border border-white/10 rounded-[2.5rem] w-full max-w-5xl overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.5)] flex flex-col md:flex-row max-h-[85vh] animate-in zoom-in-95 duration-300">
+        
+        {/* Close & Share */}
+        <div className="absolute top-8 right-8 z-30 flex gap-2">
+            <ActionButton onClick={() => setShowShare(true)}><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></ActionButton>
+            <ActionButton onClick={onClose}>✕</ActionButton>
+        </div>
 
         {/* Visual Side */}
-        <div className="md:w-1/2 relative bg-zinc-900 flex items-center justify-center p-6 md:p-10 overflow-hidden min-h-[300px]">
-          {showYouTube && youtubeId ? (
-            /* YouTube full song player */
-            <div className="w-full aspect-video z-10 rounded-xl overflow-hidden shadow-2xl">
-              <iframe
-                width="100%"
-                height="100%"
-                src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&rel=0`}
-                title="YouTube video player"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-                className="w-full h-full"
-              />
-            </div>
-          ) : vinyl.sourceType === 'spotify' && vinyl.externalId ? (
-            <div className="w-full aspect-square z-10">
-              <iframe
-                style={{ borderRadius: '12px' }}
-                src={`https://open.spotify.com/embed/track/${vinyl.externalId}?utm_source=generator&theme=0`}
-                width="100%"
-                height="100%"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                loading="lazy"
-                className="shadow-2xl"
-              />
-            </div>
-          ) : (
-            <>
-              {/* Blurred background art */}
-              <div
-                className="absolute inset-0 opacity-20 blur-3xl scale-150"
-                style={{ backgroundImage: `url(${vinyl.coverUrl})`, backgroundSize: 'cover' }}
-              />
-
-              {/* Spinning vinyl */}
-              <div className="relative w-full max-w-[320px] aspect-square">
-                <div className={`w-full h-full rounded-full overflow-hidden shadow-2xl border-4 border-black/30 ${isPlaying ? 'animate-[spin_6s_linear_infinite]' : ''}`}>
-                  <img src={vinyl.coverUrl} alt={vinyl.title} className="w-full h-full object-cover" />
+        <div className="md:w-[45%] relative flex items-center justify-center p-12 bg-black/40 border-r border-white/5 overflow-hidden">
+            <div className="absolute inset-0 opacity-30 blur-[100px] animate-pulse" style={{ background: `radial-gradient(circle, ${vinyl.circadianColor || '#00D9FF'} 0%, transparent 70%)` }} />
+            
+            <div className="relative w-full max-w-[340px] aspect-square group">
+                <div className={`w-full h-full rounded-full overflow-hidden shadow-2xl border-[12px] border-black/40 ring-1 ring-white/10 ${isPlaying ? 'animate-[spin_8s_linear_infinite]' : ''}`}>
+                    <img src={vinyl.coverUrl} alt="" className="w-full h-full object-cover" />
                 </div>
-                {/* Vinyl grooves overlay */}
-                <div
-                  className="absolute inset-0 rounded-full pointer-events-none"
-                  style={{
-                    background: 'repeating-radial-gradient(circle at center, transparent 0px, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 6px)',
-                  }}
-                />
-                {/* Shine */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none rounded-full" />
-                {/* Center hole */}
+                {/* Grooves */}
+                <div className="absolute inset-0 rounded-full bg-[repeating-radial-gradient(circle_at_center,transparent_0,transparent_4px,rgba(255,255,255,0.03)_5px)] pointer-events-none" />
+                {/* Spindle */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-5 h-5 bg-black rounded-full border border-white/20" />
+                    <div className="w-6 h-6 bg-zinc-900 rounded-full border-2 border-white/10 shadow-inner" />
                 </div>
-              </div>
-
-              {/* Controls */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                {/* Preview play/pause */}
-                {vinyl.previewUrl && (
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2 flex items-center gap-2 hover:bg-black/80 transition-colors"
-                  >
-                    {isPlaying ? (
-                      <>
-                        <div className="flex gap-[3px] items-end h-4">
-                          <div className="w-[3px] bg-accent rounded-full h-2 animate-[pulse_0.4s_ease-in-out_infinite]" />
-                          <div className="w-[3px] bg-accent rounded-full h-4 animate-[pulse_0.6s_ease-in-out_infinite]" />
-                          <div className="w-[3px] bg-accent rounded-full h-3 animate-[pulse_0.5s_ease-in-out_infinite]" />
-                        </div>
-                        <span className="text-[10px] text-white font-medium">Preview</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                        <span className="text-[10px] text-white font-medium">Preview</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {/* Full song button */}
-                {youtubeId && !showYouTube && (
-                  <button
-                    onClick={handlePlayFull}
-                    className="bg-red-600/90 hover:bg-red-600 backdrop-blur-sm border border-red-500/30 rounded-full px-4 py-2 flex items-center gap-2 transition-colors shadow-lg shadow-red-900/20"
-                  >
-                    <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                    <span className="text-[10px] text-white font-bold">Full Song</span>
-                  </button>
-                )}
-
-                {isSearchingYT && (
-                  <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-full px-4 py-2 flex items-center gap-2">
-                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span className="text-[10px] text-zinc-400 font-medium">Finding full song...</span>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Details Side */}
-        <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-between bg-gradient-to-br from-zinc-900 to-black overflow-y-auto">
-          <div className="space-y-4">
-            {/* Tags */}
-            <div className="flex flex-wrap items-center gap-2 justify-between">
-              <div className="flex flex-wrap gap-1.5">
-                {vinyl.genre.map(g => (
-                  <span key={g} className="text-[9px] uppercase tracking-wider text-accent border border-accent/20 bg-accent/5 px-2 py-0.5 rounded-full">
-                    {g}
-                  </span>
-                ))}
-                {vinyl.sourceType && (
-                  <span className="text-[9px] uppercase tracking-wider text-gold border border-gold/20 bg-gold/5 px-2 py-0.5 rounded-full">
-                    {vinyl.sourceType}
-                  </span>
-                )}
-                {showYouTube && (
-                  <span className="text-[9px] uppercase tracking-wider text-red-400 border border-red-500/20 bg-red-500/5 px-2 py-0.5 rounded-full">
-                    Full Song via YouTube
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {/* Crate button */}
-                <button
-                  onClick={handleCrateToggle}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
-                    inCrate
-                      ? 'bg-gold/20 text-gold border border-gold/40'
-                      : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:border-zinc-500'
-                  }`}
-                  title={inCrate ? 'Remove from Crate' : 'Save to Crate'}
-                >
-                  <svg className="w-3 h-3" fill={inCrate ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  {inCrate ? 'Saved' : 'Crate'}
-                </button>
-
-                {/* Like button */}
-                <button
-                  onClick={handleLikeToggle}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
-                    vinyl.isLiked
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/40'
-                      : 'bg-zinc-800/50 text-zinc-500 border border-zinc-700/50 hover:border-zinc-500'
-                  }`}
-                >
-                  <svg className={`w-3 h-3 ${vinyl.isLiked ? 'fill-current' : 'fill-none stroke-current'}`} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  {vinyl.likes}
-                </button>
-              </div>
             </div>
 
-            {/* Title & Artist */}
-            <div>
-              <h2 className="text-2xl md:text-3xl font-black text-white mb-1.5 leading-tight tracking-tight line-clamp-2">
-                {vinyl.title}
-              </h2>
-              <div className="flex items-center gap-2.5">
-                <p className="text-lg text-zinc-400 font-medium">{vinyl.artist}</p>
-                <button
-                  onClick={handleFollowToggle}
-                  className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border transition-colors ${
-                    vinyl.isFollowed
-                      ? 'bg-white text-black border-white'
-                      : 'border-zinc-600 text-zinc-500 hover:border-zinc-400'
-                  }`}
-                >
-                  {vinyl.isFollowed ? 'Following' : 'Follow'}
-                </button>
-              </div>
-              {vinyl.year && (
-                <p className="text-xs text-zinc-600 mt-1">{vinyl.year}</p>
-              )}
-            </div>
-
-            {/* AI Insight */}
-            <div className="bg-zinc-800/20 p-4 rounded-xl border border-zinc-800/50">
-              <div className="flex items-center gap-1.5 mb-2 text-gold text-[9px] font-bold uppercase tracking-[0.15em]">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                </svg>
-                AI Vibe Check
-              </div>
-
-              {isLoadingInsight ? (
-                <div className="flex gap-1 py-2">
-                  <div className="w-2 h-2 bg-zinc-700 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-zinc-700 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-zinc-700 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              ) : insight ? (
-                <div className="space-y-2">
-                  <p className="text-zinc-200 text-sm italic leading-relaxed">"{insight.vibe}"</p>
-                  {insight.trivia && (
-                    <p className="text-zinc-500 text-xs leading-relaxed">{insight.trivia}</p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-zinc-600 text-xs">Insight unavailable</p>
-              )}
-            </div>
-
-            {/* Vinyl Condition */}
-            <div className="flex items-center gap-3 px-1">
-              <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-bold whitespace-nowrap">Condition</span>
-              <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${condition * 100}%`,
-                    background: condition > 0.7 ? '#00D9FF' : condition > 0.4 ? '#FFD700' : '#666',
-                  }}
-                />
-              </div>
-              <span className="text-[9px] text-zinc-500 font-mono">
-                {condition >= 1 ? 'Mint' : condition >= 0.7 ? 'Clean' : condition >= 0.5 ? 'Good' : 'Dusty'}
-              </span>
-            </div>
-
-            {/* YouTube switch — if watching preview, offer full song */}
-            {youtubeId && !showYouTube && (
-              <button
-                onClick={handlePlayFull}
-                className="w-full bg-gradient-to-r from-red-600/20 to-red-900/20 border border-red-500/20 rounded-xl p-3 flex items-center gap-3 hover:border-red-500/40 transition-colors group"
-              >
-                <div className="bg-red-600 rounded-full p-2 group-hover:scale-110 transition-transform">
-                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-                <div className="text-left">
-                  <div className="text-white text-sm font-bold">Play Full Song</div>
-                  <div className="text-zinc-500 text-[10px]">Stream via YouTube — no limits</div>
-                </div>
-              </button>
-            )}
-
-            {showYouTube && (
-              <button
-                onClick={() => { setShowYouTube(false); setIsPlaying(!!vinyl.previewUrl); }}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                &larr; Back to vinyl view
-              </button>
-            )}
-          </div>
-
-          {/* Bottom: Listening Room */}
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center justify-between bg-zinc-900/40 p-3 rounded-xl border border-white/5">
-              <div className="flex items-center -space-x-2">
-                {listenerAvatars.slice(0, 4).map((src, i) => (
-                  <img
-                    key={i}
-                    src={src}
-                    className="w-7 h-7 rounded-full border-2 border-zinc-900 bg-zinc-800 object-cover"
-                    alt=""
-                  />
-                ))}
-                {vinyl.listenerCount > 4 && (
-                  <div className="w-7 h-7 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center text-[9px] font-bold text-zinc-400">
-                    +{vinyl.listenerCount - 4}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={handleJoinToggle}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                  vinyl.isJoined
-                    ? 'bg-green-500/15 text-green-400 border border-green-500/30'
-                    : 'bg-accent/90 hover:bg-accent text-black shadow-lg shadow-accent/10'
-                }`}
-              >
-                {vinyl.isJoined ? 'In Room' : 'Join Room'}
-              </button>
-            </div>
-
-            {/* Share This Drop */}
-            <button
-              onClick={() => setShowShare(true)}
-              className="w-full group flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-accent/5 hover:border-accent/20 transition-all text-zinc-500 hover:text-accent"
+            <button 
+                onClick={() => setIsPlaying(!isPlaying)}
+                className="absolute bottom-10 bg-white text-black h-12 px-8 rounded-full font-bold uppercase tracking-widest text-[10px] hover:scale-105 active:scale-95 transition-all shadow-xl z-20"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              <span className="text-xs font-bold uppercase tracking-wider">Share This Drop</span>
+                {isPlaying ? 'Pause Preview' : 'Play Preview'}
             </button>
-
-            {showYouTube && (
-              <p className="text-center text-[9px] text-zinc-600 uppercase tracking-[0.15em]">
-                Full Song Playing via YouTube
-              </p>
-            )}
-          </div>
         </div>
+
+        {/* Info Side */}
+        <div className="md:w-[55%] p-12 md:p-16 flex flex-col justify-between overflow-y-auto">
+            <div className="space-y-8">
+                <div>
+                    <div className="flex items-center gap-3 mb-4">
+                        <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-cyan-400/20">{vinyl.genre[0]}</span>
+                        <span className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">{vinyl.year} &bull; {vinyl.sourceType}</span>
+                    </div>
+                    <h2 className="text-white text-4xl md:text-5xl font-black tracking-tighter leading-[0.9] mb-4">{vinyl.title}</h2>
+                    <p className="text-zinc-400 text-xl font-medium tracking-tight">{vinyl.artist}</p>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-cyan-400">
+                        <div className="w-4 h-[1px] bg-cyan-400" />
+                        AI Insight
+                    </div>
+                    {isLoadingInsight ? (
+                        <div className="h-20 flex items-center gap-1"><div className="w-1 h-1 bg-zinc-800 animate-bounce" /><div className="w-1 h-1 bg-zinc-800 animate-bounce delay-75" /><div className="w-1 h-1 bg-zinc-800 animate-bounce delay-150" /></div>
+                    ) : (
+                        <p className="text-zinc-300 text-lg leading-relaxed font-medium italic">"{insight?.vibe || 'The atmosphere is shifting...'}"</p>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-6">
+                    <button onClick={handleCrateToggle} className={`flex-1 h-14 rounded-2xl font-bold uppercase tracking-widest text-[10px] border transition-all ${inCrate ? 'bg-white text-black border-white' : 'bg-transparent text-white border-white/20 hover:bg-white/5'}`}>
+                        {inCrate ? 'In Your Crate' : 'Add to Crate'}
+                    </button>
+                    {youtubeId && !showYouTube && (
+                        <button onClick={() => setShowYouTube(true)} className="flex-1 h-14 rounded-2xl bg-red-600 text-white font-bold uppercase tracking-widest text-[10px] hover:bg-red-500 transition-all shadow-lg shadow-red-600/20">
+                            Play Full Song
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="pt-12 border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="flex -space-x-3">
+                        {[1,2,3].map(i => <div key={i} className="w-10 h-10 rounded-full bg-zinc-800 border-4 border-[#0a0a0c]" />)}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{vinyl.listenerCount}+ Listening Now</div>
+                </div>
+                <div className="text-[10px] text-zinc-700 font-mono">ID: {vinyl.id.slice(-8)}</div>
+            </div>
+        </div>
+
+        {/* YouTube Overlay */}
+        {showYouTube && youtubeId && (
+            <div className="absolute inset-0 z-50 bg-black animate-in fade-in duration-500 flex flex-col">
+                <div className="p-8 flex justify-between items-center bg-black/80 backdrop-blur-xl">
+                    <h3 className="text-white font-bold uppercase tracking-widest text-xs">YouTube Cinema Mode</h3>
+                    <button onClick={() => setShowYouTube(false)} className="text-zinc-500 hover:text-white font-bold">Close Player</button>
+                </div>
+                <iframe className="flex-1 w-full" src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1`} frameBorder="0" allow="autoplay; encrypted-media" allowFullScreen />
+            </div>
+        )}
       </div>
 
-      {/* Animation keyframe */}
-      <style>{`
-        @keyframes fadeZoomIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
-
-      {/* Share postcard overlay */}
-      {showShare && (
-        <SharePostcard vinyl={vinyl} onClose={() => setShowShare(false)} />
-      )}
+      {showShare && <SharePostcard vinyl={vinyl} onClose={() => setShowShare(false)} />}
     </div>
   );
 };
+
+const ActionButton: React.FC<{ onClick: () => void; children: React.ReactNode }> = ({ onClick, children }) => (
+    <button onClick={onClick} className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white transition-all">{children}</button>
+);
 
 export default PlayerModal;

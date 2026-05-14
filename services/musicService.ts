@@ -13,6 +13,8 @@ class AudioManager {
   private audioCtx: AudioContext | null = null;
   private filterNode: BiquadFilterNode | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
+  private analyser: AnalyserNode | null = null;
+  private freqData: Uint8Array = new Uint8Array(32);
 
   get isPlaying(): boolean {
     return !!this.currentAudio && !this.currentAudio.paused;
@@ -20,6 +22,23 @@ class AudioManager {
 
   get url(): string | null {
     return this.currentUrl;
+  }
+
+  getAudioLevels() {
+    if (!this.analyser || !this.isPlaying) return { bass: 0, mid: 0 };
+    
+    this.analyser.getByteFrequencyData(this.freqData);
+    
+    // Simple frequency bin averaging
+    let bass = 0;
+    for (let i = 0; i < 4; i++) bass += this.freqData[i];
+    bass = (bass / 4) / 255;
+
+    let mid = 0;
+    for (let i = 4; i < 16; i++) mid += this.freqData[i];
+    mid = (mid / 12) / 255;
+
+    return { bass, mid };
   }
 
   onStateChange(fn: AudioListener) {
@@ -31,6 +50,16 @@ class AudioManager {
     this.listeners.forEach(fn => fn(playing, url));
   }
 
+  private ensureAudioCtx() {
+    if (!this.audioCtx) {
+      this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume();
+    }
+    return this.audioCtx;
+  }
+
   play(url: string, condition?: number) {
     if (this.currentUrl === url && this.currentAudio && !this.currentAudio.paused) return;
     this.stop();
@@ -39,11 +68,24 @@ class AudioManager {
     this.currentAudio = new Audio(url);
     this.currentAudio.volume = 0;
     this.currentAudio.loop = true;
+    this.currentAudio.crossOrigin = "anonymous";
 
-    // Apply vinyl condition filter if condition is provided
-    if (condition !== undefined && condition < 1) {
-      this.applyConditionFilter(this.currentAudio, condition);
-    }
+    // Setup routing
+    const ctx = this.ensureAudioCtx();
+    this.sourceNode = ctx.createMediaElementSource(this.currentAudio);
+    
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 64;
+    this.analyser.smoothingTimeConstant = 0.8;
+    
+    this.filterNode = ctx.createBiquadFilter();
+    this.filterNode.type = 'lowpass';
+    const initialFreq = condition !== undefined ? (800 + condition * 19200) : 20000;
+    this.filterNode.frequency.value = initialFreq;
+
+    this.sourceNode.connect(this.analyser);
+    this.analyser.connect(this.filterNode);
+    this.filterNode.connect(ctx.destination);
 
     // Notify immediately with the URL so UI can show it
     this.notify(true, url);
@@ -56,24 +98,6 @@ class AudioManager {
           console.warn("Audio play blocked:", error);
           this.notify(false, null);
         });
-    }
-  }
-
-  private applyConditionFilter(audio: HTMLAudioElement, condition: number) {
-    try {
-      if (!this.audioCtx) {
-        this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      this.sourceNode = this.audioCtx.createMediaElementSource(audio);
-      this.filterNode = this.audioCtx.createBiquadFilter();
-      this.filterNode.type = 'lowpass';
-      // condition 0 → 800Hz (very muffled), condition 1 → 20000Hz (clear)
-      this.filterNode.frequency.value = 800 + condition * 19200;
-      this.filterNode.Q.value = 0.7;
-      this.sourceNode.connect(this.filterNode);
-      this.filterNode.connect(this.audioCtx.destination);
-    } catch {
-      // Fallback: play without filter
     }
   }
 
@@ -92,6 +116,7 @@ class AudioManager {
     }
     this.notify(false, null);
   }
+
 
   private fadeIn() {
     if (!this.currentAudio) return;

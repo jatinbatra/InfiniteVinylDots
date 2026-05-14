@@ -1,4 +1,5 @@
 import React, { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLOBE_RADIUS } from './Earth';
 
@@ -17,6 +18,7 @@ const vertexShader = `
 const fragmentShader = `
   uniform vec3 sunDirection;
   uniform vec3 atmosphereColor;
+  uniform float uBass;
   varying vec3 vNormal;
   varying vec3 vEyeVector;
 
@@ -29,21 +31,27 @@ const fragmentShader = `
     // Sun-side interaction
     float sunFacing = max(0.0, dot(vNormal, normalize(sunDirection)));
     
-    // Combine for a beautiful glowing edge
-    float alpha = rim * (0.4 + 0.6 * sunFacing);
+    // Combine for a beautiful glowing edge, boosted by bass
+    float alpha = rim * (0.4 + 0.6 * sunFacing) * (1.0 + uBass * 0.5);
     
     // Add a slight core glow
-    float core = pow(1.0 - max(0.0, dotProduct), 2.0) * 0.1;
+    float core = pow(1.0 - max(0.0, dotProduct), 2.0) * 0.1 * (1.0 + uBass);
     
     gl_FragColor = vec4(atmosphereColor, (alpha + core) * 0.8);
   }
 `;
 
-const Atmosphere: React.FC<{ sunDirection: THREE.Vector3 }> = ({ sunDirection }) => {
+const Atmosphere: React.FC<{ sunDirection: THREE.Vector3, uBass?: number }> = ({ sunDirection, uBass = 0 }) => {
   const uniforms = useMemo(() => ({
     sunDirection: { value: sunDirection },
     atmosphereColor: { value: new THREE.Color('#00D9FF') },
+    uBass: { value: 0 }
   }), [sunDirection]);
+
+  useFrame(() => {
+    uniforms.uBass.value = uBass;
+    uniforms.sunDirection.value.copy(sunDirection);
+  });
 
   return (
     <mesh renderOrder={1}>
@@ -62,4 +70,3 @@ const Atmosphere: React.FC<{ sunDirection: THREE.Vector3 }> = ({ sunDirection })
 };
 
 export default Atmosphere;
-

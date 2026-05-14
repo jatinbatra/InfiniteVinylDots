@@ -23,84 +23,72 @@ const vertexShader = `
 const fragmentShader = `
   uniform sampler2D earthMap;
   uniform vec3 sunDirection;
-  uniform float time;
+  uniform float uBass;
+  uniform float uMid;
 
   varying vec3 vNormal;
   varying vec3 vWorldPosition;
   varying vec2 vUv;
 
   void main() {
-    // Sample the earth texture
     vec4 texColor = texture2D(earthMap, vUv);
-
-    // Day/night factor based on sun direction
     float daylight = dot(normalize(vNormal), normalize(sunDirection));
-    daylight = smoothstep(-0.15, 0.35, daylight);
+    daylight = smoothstep(-0.2, 0.3, daylight);
 
-    // Day side: show texture brighter + slight blue tint
-    vec3 dayTint = vec3(0.7, 0.85, 1.0);
-    vec3 dayColor = texColor.rgb * dayTint * 2.5;
-
-    // Night side: show texture dimmer + warm city lights pop more
-    float luminance = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
-    vec3 nightColor = texColor.rgb * 0.4 + vec3(luminance * 1.5, luminance * 0.8, luminance * 0.2);
-
-    vec3 baseColor = mix(nightColor, dayColor, daylight);
-
-    // Terminator line glow (orange band at day/night border)
-    float terminator = 1.0 - smoothstep(0.0, 0.12, abs(daylight - 0.45));
-    vec3 terminatorColor = vec3(1.0, 0.4, 0.05) * terminator * 0.4;
-
-    // Subtle atmosphere scatter on edges
+    // Cyber-Stylized Colors
+    vec3 landColor = vec3(0.02, 0.05, 0.1);
+    vec3 glowColor = vec3(0.0, 0.8, 1.0);
+    
+    // Mix programmatic colors based on texture mask
+    vec3 baseColor = mix(vec3(0.005, 0.008, 0.02), landColor, texColor.r);
+    
+    // Dynamic Rim
     vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-    float rim = 1.0 - max(0.0, dot(viewDir, vNormal));
-    rim = pow(rim, 4.0);
-    vec3 rimColor = vec3(0.0, 0.6, 1.0) * rim * 0.5 * (0.3 + 0.7 * daylight);
+    float rim = pow(1.0 - max(0.0, dot(viewDir, vNormal)), 4.0);
+    vec3 rimColor = glowColor * rim * (0.5 + uBass * 0.5);
 
-    vec3 finalColor = baseColor + terminatorColor + rimColor;
+    // City lights pulse with music
+    float lights = texColor.g * (1.0 + uMid * 3.0);
+    vec3 lightColor = vec3(1.0, 0.8, 0.4) * lights * (1.0 - daylight);
 
-
-    gl_FragColor = vec4(finalColor, 1.0);
+    gl_FragColor = vec4(baseColor + rimColor + lightColor, 1.0);
   }
 `;
 
 interface EarthProps {
   radius?: number;
+  uBass?: number;
+  uMid?: number;
 }
 
-const Earth: React.FC<EarthProps> = ({ radius = GLOBE_RADIUS }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
+const Earth: React.FC<EarthProps> = ({ radius = GLOBE_RADIUS, uBass = 0, uMid = 0 }) => {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
   const { texture, uniforms } = useMemo(() => {
-    const canvas = generateEarthTexture();
+    // Revert to generated texture for instant load and stylized look
+    const canvas = generateEarthTexture(1024, 512);
     const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-
     return {
       texture: tex,
       uniforms: {
         earthMap: { value: tex },
         sunDirection: { value: getSunDirection() },
-        time: { value: 0 },
+        uBass: { value: 0 },
+        uMid: { value: 0 }
       },
     };
   }, []);
 
-  useFrame((_, delta) => {
+  useFrame(() => {
     if (materialRef.current) {
-      materialRef.current.uniforms.time.value += delta;
-      if (Math.floor(materialRef.current.uniforms.time.value) % 5 === 0) {
-        materialRef.current.uniforms.sunDirection.value.copy(getSunDirection());
-      }
+      materialRef.current.uniforms.uBass.value = uBass;
+      materialRef.current.uniforms.uMid.value = uMid;
+      materialRef.current.uniforms.sunDirection.value.copy(getSunDirection());
     }
   });
 
   return (
-    <mesh ref={meshRef} renderOrder={0}>
+    <mesh renderOrder={0}>
       <sphereGeometry args={[radius, 64, 64]} />
       <shaderMaterial
         ref={materialRef}
