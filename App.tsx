@@ -29,7 +29,6 @@ const App: React.FC = () => {
   const [crateCount, setCrateCount] = useState(() => getCrate().length);
   const [chartOpen, setChartOpen] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
-  const [graphicsQuality, setGraphicsQuality] = useState<'low' | 'high'>('high');
 
   const isDeepLink = hasShareParams();
   const regionsRef = useRef(regions);
@@ -38,18 +37,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const unlock = () => {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      ctx.resume().catch(() => {});
       setAudioUnlocked(true);
       window.removeEventListener('click', unlock);
       window.removeEventListener('touchstart', unlock);
     };
     window.addEventListener('click', unlock);
     window.addEventListener('touchstart', unlock);
-    return () => {
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('touchstart', unlock);
-    };
+    return () => { window.removeEventListener('click', unlock); window.removeEventListener('touchstart', unlock); };
   }, []);
 
   useEffect(() => {
@@ -78,108 +72,34 @@ const App: React.FC = () => {
 
     setRegions(prev => {
       const next = { ...prev };
-      toLoad.forEach(r => {
-        if (!next[r.name]) next[r.name] = { id: r.name, status: 'loading', data: [] };
-      });
+      toLoad.forEach(r => { if (!next[r.name]) next[r.name] = { id: r.name, status: 'loading', data: [] }; });
       return next;
     });
 
-    const results = await Promise.allSettled(
-      toLoad.map(r => fetchRegionalTracks(r.code, r.lat, r.lng, r.name))
-    );
-
+    const results = await Promise.allSettled(toLoad.map(r => fetchRegionalTracks(r.code, r.lat, r.lng, r.name)));
     toLoad.forEach(r => fetchingRef.current.delete(r.name));
 
     setRegions(prev => {
       const next = { ...prev };
       results.forEach((result, idx) => {
         const r = toLoad[idx];
-        if (result.status === 'fulfilled' && result.value) {
-          next[r.name] = { id: r.name, status: 'loaded', data: result.value };
-        } else if (result.status === 'rejected') {
-          next[r.name] = { id: r.name, status: 'error', data: [] };
-        }
+        if (result.status === 'fulfilled' && result.value) { next[r.name] = { id: r.name, status: 'loaded', data: result.value }; }
+        else if (result.status === 'rejected') { next[r.name] = { id: r.name, status: 'error', data: [] }; }
       });
       return next;
     });
   }, []);
 
-  useEffect(() => {
-    loadBatch(REGIONS.slice(0, 10).map(r => r.name));
-  }, [loadBatch]);
+  useEffect(() => { loadBatch(REGIONS.slice(0, 10).map(r => r.name)); }, [loadBatch]);
 
   const handleVisibleRegions = useCallback((regionNames: string[]) => {
     const unloaded = regionNames.filter(n => !regionsRef.current[n]);
-    if (unloaded.length > 0) {
-      loadBatch(unloaded);
-    }
+    if (unloaded.length > 0) loadBatch(unloaded);
   }, [loadBatch]);
 
-  const allVinyls = React.useMemo(() => {
-    return Object.values(regions).flatMap((region: Chunk) => region.data);
-  }, [regions]);
+  const allVinyls = React.useMemo(() => Object.values(regions).flatMap((region: Chunk) => region.data), [regions]);
 
-  const loadedRegionCount = React.useMemo(() => {
-    return Object.values(regions).filter((r: Chunk) => r.status === 'loaded').length;
-  }, [regions]);
-
-  const handleVinylClick = useCallback((vinyl: VinylRecord) => {
-    setSelectedVinyl(vinyl);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setSelectedVinyl(null);
-  }, []);
-
-  const handleVinylUpdate = useCallback((updatedVinyl: VinylRecord) => {
-    setSelectedVinyl(updatedVinyl);
-    setRegions(prev => {
-      const newRegions = { ...prev };
-      for (const key in newRegions) {
-        const chunk = newRegions[key];
-        const idx = chunk.data.findIndex(v => v.id === updatedVinyl.id);
-        if (idx !== -1) {
-          const newData = [...chunk.data];
-          newData[idx] = updatedVinyl;
-          newRegions[key] = { ...chunk, data: newData };
-          break;
-        }
-      }
-      return newRegions;
-    });
-  }, []);
-
-  const handleDropSubmit = async (data: {
-    title: string;
-    artist: string;
-    coverUrl: string;
-    sourceType: 'itunes' | 'youtube' | 'spotify';
-    externalId?: string;
-    searchTerm?: string;
-  }) => {
-    setIsDropModalOpen(false);
-    let newVinyl: VinylRecord;
-    if (data.searchTerm) {
-      const tracks = await fetchTrackSearch(data.searchTerm);
-      if (tracks.length > 0) {
-        newVinyl = { ...tracks[0], lat: 40, lng: -74, isOwner: true };
-      } else { return; }
-    } else {
-      newVinyl = {
-        id: `custom-${Date.now()}`,
-        albumId: `ext-${Date.now()}`,
-        title: data.title, artist: data.artist, year: new Date().getFullYear(),
-        coverUrl: data.coverUrl, sourceType: data.sourceType, externalId: data.externalId,
-        lat: 40.7, lng: -74, listenerCount: 1, genre: ['User Drop'], isPlaying: false, isOwner: true,
-        likes: 0, isLiked: false, isJoined: true, isFollowed: true, circadianColor: '#FFD700', circadianMood: 'Your Pick',
-      };
-    }
-    setRegions(prev => {
-      const userRegion = prev['user'] || { id: 'user', status: 'loaded', data: [] };
-      return { ...prev, user: { ...userRegion, data: [...userRegion.data, newVinyl] } };
-    });
-    setSelectedVinyl(newVinyl);
-  };
+  const handleVinylClick = useCallback((vinyl: VinylRecord) => { setSelectedVinyl(vinyl); }, []);
 
   const handleFlyTo = useCallback((lat: number, lng: number) => {
     setFlyToTarget({ lat, lng });
@@ -197,10 +117,8 @@ const App: React.FC = () => {
     handleVinylClick(vinyl);
   }, [autoPilot, handleVinylClick]);
 
-  const myVinyl = allVinyls.find(v => v.isOwner);
-
   return (
-    <div className="w-full h-full font-sans text-white">
+    <div className="w-full h-full font-sans text-white bg-black">
       {!welcomeDismissed && (
         <WelcomeScreen skipWelcome={isDeepLink} onDismiss={() => setWelcomeDismissed(true)} />
       )}
@@ -211,7 +129,6 @@ const App: React.FC = () => {
         <GlobeScene
           vinyls={allVinyls} regions={regions} onVinylClick={handleVinylClickWithAutoPilotStop}
           audioUnlocked={audioUnlocked} flyToTarget={flyToTarget} onVisibleRegionsChange={handleVisibleRegions}
-          quality={graphicsQuality}
         />
       )}
 
@@ -226,7 +143,6 @@ const App: React.FC = () => {
             onAutoPilotToggle={handleAutoPilotToggle}
             autoPilotActive={autoPilot.active}
             crateCount={crateCount}
-            myVinyl={myVinyl}
             vinylCount={allVinyls.length}
             isZenMode={autoPilot.active}
           />
@@ -235,12 +151,8 @@ const App: React.FC = () => {
           {!autoPilot.active && <ActivityTicker vinyls={allVinyls} />}
 
           <AutoPilotPanel
-            active={autoPilot.active}
-            cityName={autoPilot.cityName}
-            djIntro={autoPilot.djIntro}
-            track={autoPilot.track}
-            moodColor={autoPilot.moodColor}
-            onTrackClick={handleVinylClickWithAutoPilotStop}
+            active={autoPilot.active} cityName={autoPilot.cityName} djIntro={autoPilot.djIntro}
+            track={autoPilot.track} moodColor={autoPilot.moodColor} onTrackClick={handleVinylClickWithAutoPilotStop}
           />
 
           <CratePanel
@@ -251,16 +163,20 @@ const App: React.FC = () => {
             open={chartOpen} onClose={() => setChartOpen(false)} regions={regions}
             onFlyAndPlay={(vinyl) => {
               if (autoPilot.active) autoPilot.stop();
-              if (vinyl.lat != null && vinyl.lng != null) { handleFlyTo(vinyl.lat, vinyl.lng); }
+              if (vinyl.lat != null && vinyl.lng != null) handleFlyTo(vinyl.lat, vinyl.lng);
               setSelectedVinyl(vinyl);
             }}
           />
+
           {selectedVinyl && (
-            <PlayerModal vinyl={selectedVinyl} onClose={() => { handleCloseModal(); setCrateCount(getCrate().length); }} onUpdate={handleVinylUpdate} />
+            <PlayerModal
+              vinyl={selectedVinyl}
+              onClose={() => { setSelectedVinyl(null); setCrateCount(getCrate().length); }}
+              onUpdate={(v) => setSelectedVinyl(v)}
+            />
           )}
-          {isDropModalOpen && (
-            <DropModal onClose={() => setIsDropModalOpen(false)} onSubmit={handleDropSubmit} />
-          )}
+
+          {isDropModalOpen && <DropModal onClose={() => setIsDropModalOpen(false)} onSubmit={() => setIsDropModalOpen(false)} />}
         </>
       )}
     </div>

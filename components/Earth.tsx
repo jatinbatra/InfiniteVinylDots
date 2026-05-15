@@ -18,45 +18,32 @@ const vertexShader = `
 
 const fragmentShader = `
   uniform sampler2D earthMap;
-  uniform vec3 sunDirection;
   varying vec3 vNormal;
   varying vec2 vUv;
 
   void main() {
     vec4 texColor = texture2D(earthMap, vUv);
-    float daylight = dot(normalize(vNormal), normalize(sunDirection));
-    daylight = smoothstep(-0.1, 0.2, daylight);
-
-    // Clean, high-contrast look
-    vec3 nightColor = texColor.rgb * 0.2;
-    vec3 dayColor = texColor.rgb;
     
-    // Add warm city lights pop on night side
-    float lights = texColor.g;
-    vec3 lightGlow = vec3(1.0, 0.8, 0.5) * lights * (1.0 - daylight) * 2.0;
+    // Minimal dark base for "Infinite Dots" to pop
+    vec3 landColor = vec3(0.04, 0.08, 0.15) * texColor.r;
+    vec3 oceanColor = vec3(0.01, 0.02, 0.05) * (1.0 - texColor.r);
+    
+    // Ambient highlights on land
+    float highlight = texColor.g * 0.1;
 
-    gl_FragColor = vec4(mix(nightColor, dayColor, daylight) + lightGlow, 1.0);
+    gl_FragColor = vec4(landColor + oceanColor + highlight, 1.0);
   }
 `;
 
 const Earth: React.FC = () => {
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({
-    earthMap: { value: new THREE.CanvasTexture(generateEarthTexture(1024, 512)) },
-    sunDirection: { value: getSunDirection() }
+    earthMap: { value: new THREE.CanvasTexture(generateEarthTexture(1024, 512)) }
   }), []);
-
-  useFrame(() => {
-    if (materialRef.current) {
-        materialRef.current.uniforms.sunDirection.value.copy(getSunDirection());
-    }
-  });
 
   return (
     <mesh>
       <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
       <shaderMaterial 
-        ref={materialRef}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
         uniforms={uniforms}
