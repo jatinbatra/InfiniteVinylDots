@@ -8,89 +8,54 @@ const GLOBE_RADIUS = 2;
 
 const vertexShader = `
   varying vec3 vNormal;
-  varying vec3 vWorldPosition;
   varying vec2 vUv;
-
   void main() {
     vUv = uv;
     vNormal = normalize(normalMatrix * normal);
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPosition = worldPos.xyz;
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
 const fragmentShader = `
   uniform sampler2D earthMap;
   uniform vec3 sunDirection;
-  uniform float uBass;
-  uniform float uMid;
-
   varying vec3 vNormal;
-  varying vec3 vWorldPosition;
   varying vec2 vUv;
 
   void main() {
     vec4 texColor = texture2D(earthMap, vUv);
     float daylight = dot(normalize(vNormal), normalize(sunDirection));
-    daylight = smoothstep(-0.2, 0.3, daylight);
+    daylight = smoothstep(-0.1, 0.2, daylight);
 
-    // Cyber-Stylized Colors
-    vec3 landColor = vec3(0.02, 0.05, 0.1);
-    vec3 glowColor = vec3(0.0, 0.8, 1.0);
+    // Clean, high-contrast look
+    vec3 nightColor = texColor.rgb * 0.2;
+    vec3 dayColor = texColor.rgb;
     
-    // Mix programmatic colors based on texture mask
-    vec3 baseColor = mix(vec3(0.005, 0.008, 0.02), landColor, texColor.r);
-    
-    // Dynamic Rim
-    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-    float rim = pow(1.0 - max(0.0, dot(viewDir, vNormal)), 4.0);
-    vec3 rimColor = glowColor * rim * (0.5 + uBass * 0.5);
+    // Add warm city lights pop on night side
+    float lights = texColor.g;
+    vec3 lightGlow = vec3(1.0, 0.8, 0.5) * lights * (1.0 - daylight) * 2.0;
 
-    // City lights pulse with music
-    float lights = texColor.g * (1.0 + uMid * 3.0);
-    vec3 lightColor = vec3(1.0, 0.8, 0.4) * lights * (1.0 - daylight);
-
-    gl_FragColor = vec4(baseColor + rimColor + lightColor, 1.0);
+    gl_FragColor = vec4(mix(nightColor, dayColor, daylight) + lightGlow, 1.0);
   }
 `;
 
-interface EarthProps {
-  radius?: number;
-  uBass?: number;
-  uMid?: number;
-}
-
-const Earth: React.FC<EarthProps> = ({ radius = GLOBE_RADIUS, uBass = 0, uMid = 0 }) => {
+const Earth: React.FC = () => {
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-
-  const { texture, uniforms } = useMemo(() => {
-    // Revert to generated texture for instant load and stylized look
-    const canvas = generateEarthTexture(1024, 512);
-    const tex = new THREE.CanvasTexture(canvas);
-    return {
-      texture: tex,
-      uniforms: {
-        earthMap: { value: tex },
-        sunDirection: { value: getSunDirection() },
-        uBass: { value: 0 },
-        uMid: { value: 0 }
-      },
-    };
-  }, []);
+  const uniforms = useMemo(() => ({
+    earthMap: { value: new THREE.CanvasTexture(generateEarthTexture(1024, 512)) },
+    sunDirection: { value: getSunDirection() }
+  }), []);
 
   useFrame(() => {
     if (materialRef.current) {
-      materialRef.current.uniforms.uBass.value = uBass;
-      materialRef.current.uniforms.uMid.value = uMid;
-      materialRef.current.uniforms.sunDirection.value.copy(getSunDirection());
+        materialRef.current.uniforms.sunDirection.value.copy(getSunDirection());
     }
   });
 
   return (
-    <mesh renderOrder={0}>
-      <sphereGeometry args={[radius, 64, 64]} />
-      <shaderMaterial
+    <mesh>
+      <sphereGeometry args={[GLOBE_RADIUS, 64, 64]} />
+      <shaderMaterial 
         ref={materialRef}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
