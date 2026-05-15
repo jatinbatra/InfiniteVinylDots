@@ -6,6 +6,8 @@ import Earth, { GLOBE_RADIUS } from './Earth';
 import Atmosphere from './Atmosphere';
 import VinylMarker3D from './VinylMarker3D';
 import GlobalVinylField from './GlobalVinylField';
+import MusicConstellations from './MusicConstellations';
+import SpatialMixer from './SpatialMixer';
 import { VinylRecord, Chunk } from '../types';
 import { getSunDirection, latLngToSphere } from '../utils/geoUtils';
 import { REGIONS } from '../constants';
@@ -79,10 +81,11 @@ const GlobeContent: React.FC<GlobeSceneProps> = ({ vinyls, regions, onVinylClick
       <Earth />
       <Atmosphere sunDirection={getSunDirection()} />
 
-      {/* The Infinite Field - Thousands of dots */}
       <GlobalVinylField />
+      <MusicConstellations />
+      
+      <SpatialMixer vinyls={vinyls} active={audioUnlocked} />
 
-      {/* Real tracks - Hero dots */}
       {vinyls.map(vinyl => (
         <VinylMarker3D key={vinyl.id} vinyl={vinyl} onClick={onVinylClick} audioUnlocked={audioUnlocked} />
       ))}
