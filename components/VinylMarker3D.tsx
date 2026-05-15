@@ -1,4 +1,4 @@
-import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -19,13 +19,13 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
   const cacheKey = `${coverUrl || color}`;
   if (textureCache.has(cacheKey)) return textureCache.get(cacheKey)!;
 
-  const size = 128;
+  const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
   const cx = size / 2;
-  const r = cx - 4;
+  const r = cx - 2;
 
   ctx.beginPath();
   ctx.arc(cx, cx, r, 0, Math.PI * 2);
@@ -41,7 +41,7 @@ function createMarkerTexture(color: string, coverUrl?: string): THREE.CanvasText
     img.onload = () => {
       ctx.save(); ctx.beginPath(); ctx.arc(cx, cx, r, 0, Math.PI * 2); ctx.clip();
       ctx.drawImage(img, 0, 0, size, size); ctx.restore();
-      ctx.beginPath(); ctx.arc(cx, cx, r, 0, Math.PI * 2); ctx.strokeStyle = color; ctx.lineWidth = 6; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cx, r, 0, Math.PI * 2); ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.stroke();
       tex.needsUpdate = true;
     };
     img.src = coverUrl.replace('600x600', '100x100');
@@ -54,7 +54,7 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   const [hovered, setHovered] = useState(false);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const position = useMemo(() => latLngToSphere(vinyl.lat ?? 0, vinyl.lng ?? 0, GLOBE_RADIUS * 1.01), [vinyl.lat, vinyl.lng]);
+  const position = useMemo(() => latLngToSphere(vinyl.lat ?? 0, vinyl.lng ?? 0, GLOBE_RADIUS * 1.005), [vinyl.lat, vinyl.lng]);
   const normal = useMemo(() => position.clone().normalize(), [position]);
   const color = vinyl.circadianColor || '#00D9FF';
   const texture = useMemo(() => createMarkerTexture(color, vinyl.coverUrl), [color, vinyl.coverUrl]);
@@ -63,8 +63,8 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   useFrame((state, delta) => {
     if (!groupRef.current) return;
     const targetScale = hovered ? 2.5 : 1.0;
-    groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.1));
-    if (vinyl.isPlaying || hovered) groupRef.current.rotateZ(delta * (hovered ? 4 : 1));
+    groupRef.current.scale.setScalar(THREE.MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.15));
+    if (vinyl.isPlaying || hovered) groupRef.current.rotateZ(delta * (hovered ? 3 : 0.5));
   });
 
   const handlePointerOver = (e: any) => {
@@ -82,21 +82,21 @@ const VinylMarker3D: React.FC<VinylMarker3DProps> = ({ vinyl, onClick, audioUnlo
   return (
     <group position={position} quaternion={quaternion} ref={groupRef}>
       <mesh onPointerOver={handlePointerOver} onPointerOut={handlePointerOut} onClick={(e) => { e.stopPropagation(); onClick(vinyl); }}>
-        <circleGeometry args={[0.08, 32]} />
-        <meshBasicMaterial map={texture} transparent opacity={1} side={THREE.DoubleSide} />
+        <circleGeometry args={[0.04, 32]} />
+        <meshBasicMaterial map={texture} transparent side={THREE.DoubleSide} />
       </mesh>
       
-      {/* Visual ring */}
-      <mesh position={[0, 0, -0.001]}>
-        <ringGeometry args={[0.09, 0.12, 32]} />
-        <meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} />
+      {/* Visual ring - now much thinner */}
+      <mesh position={[0, 0, -0.0001]}>
+        <ringGeometry args={[0.045, 0.055, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
 
       {hovered && (
-        <Html position={[0, 0.4, 0]} center>
-          <div className="bg-black/90 px-4 py-2 rounded-xl border border-white/20 whitespace-nowrap text-center shadow-2xl pointer-events-none">
-            <div className="text-white font-bold text-sm">{vinyl.title}</div>
-            <div className="text-zinc-400 text-[10px] uppercase tracking-widest">{vinyl.artist}</div>
+        <Html position={[0, 0.15, 0]} center>
+          <div className="bg-black/90 px-3 py-1.5 rounded-lg border border-white/20 whitespace-nowrap text-center shadow-2xl pointer-events-none">
+            <div className="text-white font-bold text-[10px]">{vinyl.title}</div>
+            <div className="text-zinc-400 text-[8px] uppercase tracking-widest">{vinyl.artist}</div>
           </div>
         </Html>
       )}

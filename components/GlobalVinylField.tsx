@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { GLOBE_RADIUS } from './Earth';
 import { getCircadianMood } from '../services/circadianService';
 
-const DOT_COUNT = 8000;
+const DOT_COUNT = 6000; // Slightly reduced count for clarity
 
 const GlobalVinylField: React.FC = () => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
@@ -15,11 +15,10 @@ const GlobalVinylField: React.FC = () => {
     const ids = new Float32Array(DOT_COUNT);
 
     for (let i = 0; i < DOT_COUNT; i++) {
-      // Uniform distribution on sphere
       const phi = Math.acos(2 * Math.random() - 1);
       const theta = Math.random() * Math.PI * 2;
       
-      const r = GLOBE_RADIUS * 1.01;
+      const r = GLOBE_RADIUS * 1.002; // Closer to surface
       const x = r * Math.sin(phi) * Math.cos(theta);
       const y = r * Math.cos(phi);
       const z = r * Math.sin(phi) * Math.sin(theta);
@@ -28,7 +27,6 @@ const GlobalVinylField: React.FC = () => {
       pos[i * 3 + 1] = y;
       pos[i * 3 + 2] = z;
 
-      // Longitude for color mapping (-180 to 180)
       const lng = (theta * 180) / Math.PI - 180;
       const mood = getCircadianMood(lng);
       const color = new THREE.Color(mood.color);
@@ -49,15 +47,11 @@ const GlobalVinylField: React.FC = () => {
     const time = state.clock.getElapsedTime();
 
     for (let i = 0; i < DOT_COUNT; i++) {
-      const x = positions[i * 3];
-      const y = positions[i * 3 + 1];
-      const z = positions[i * 3 + 2];
-      
-      dummy.position.set(x, y, z);
+      dummy.position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
       dummy.lookAt(0, 0, 0);
       
-      // Twinkle effect
-      const s = 0.008 + Math.sin(time * 2 + ids[i] * 10) * 0.003;
+      // Much smaller twinkly dots
+      const s = 0.003 + Math.sin(time * 1.5 + ids[i] * 20) * 0.001;
       dummy.scale.set(s, s, s);
       
       dummy.updateMatrix();
@@ -68,8 +62,8 @@ const GlobalVinylField: React.FC = () => {
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, DOT_COUNT]}>
-      <sphereGeometry args={[1, 6, 6]} />
-      <meshBasicMaterial vertexColors transparent opacity={0.4} />
+      <sphereGeometry args={[1, 4, 4]} />
+      <meshBasicMaterial vertexColors transparent opacity={0.3} />
     </instancedMesh>
   );
 };

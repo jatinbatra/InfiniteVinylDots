@@ -43,48 +43,33 @@ const AutoPilotPanel: React.FC<AutoPilotPanelProps> = ({
   cityName,
   djIntro,
   track,
-  moodColor,
-  onTrackClick,
 }) => {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (active && cityName) {
-      setVisible(true);
-    } else if (!active) {
-      setVisible(false);
-    }
-  }, [active, cityName]);
-
-  if (!visible) return null;
+  if (!active || !cityName) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center pointer-events-none px-6">
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center pointer-events-none w-full px-12">
       <div
-        className="max-w-2xl w-full text-center transition-all duration-1000"
+        className="text-center transition-all duration-1000 max-w-xl"
         style={{
           opacity: djIntro ? 1 : 0,
-          transform: `translateY(${djIntro ? '0' : '20px'})`,
         }}
       >
-        {/* DJ Intro with typewriter */}
-        <div className="mb-8">
-          {djIntro && (
-            <h2 className="text-2xl md:text-4xl text-white font-black tracking-tighter leading-tight italic drop-shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-              <TypewriterText text={djIntro} speed={40} />
-            </h2>
-          )}
-        </div>
+        {/* Subtitle-style minimal DJ intro */}
+        {djIntro && (
+          <h2 className="text-lg md:text-xl text-white font-medium tracking-tight italic drop-shadow-lg mb-6">
+            <TypewriterText text={djIntro} speed={30} />
+          </h2>
+        )}
 
-        {/* Track info - Small & Minimal */}
+        {/* Small Track Card */}
         {track && (
-          <div className="flex flex-col items-center gap-3">
-             <div className="w-16 h-16 rounded-full overflow-hidden shadow-2xl border-2 border-white/20 animate-pulse">
+          <div className="flex items-center gap-4 bg-black/40 backdrop-blur-xl border border-white/10 p-2 pr-6 rounded-full shadow-2xl animate-in slide-in-from-bottom-4 duration-700">
+             <div className="w-10 h-10 rounded-full overflow-hidden border border-white/10">
                 <img src={track.coverUrl} className="w-full h-full object-cover" alt="" />
              </div>
-             <div>
-                <div className="text-white text-xs font-bold uppercase tracking-widest">{track.title}</div>
-                <div className="text-white/40 text-[10px] uppercase tracking-widest mt-1">{track.artist} &bull; {cityName}</div>
+             <div className="text-left">
+                <div className="text-white text-[10px] font-bold uppercase tracking-widest leading-none">{track.title}</div>
+                <div className="text-zinc-500 text-[9px] uppercase tracking-widest mt-1">{track.artist} &bull; {cityName}</div>
              </div>
           </div>
         )}
@@ -92,6 +77,5 @@ const AutoPilotPanel: React.FC<AutoPilotPanelProps> = ({
     </div>
   );
 };
-
 
 export default AutoPilotPanel;
