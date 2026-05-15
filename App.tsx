@@ -6,7 +6,6 @@ import DropModal from './components/DropModal';
 import SearchBar from './components/SearchBar';
 import NowPlayingBar from './components/NowPlayingBar';
 import ActivityTicker from './components/ActivityTicker';
-import VinylVortex from './components/VinylVortex';
 import CratePanel from './components/CratePanel';
 import AutoPilotPanel from './components/AutoPilotPanel';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -24,7 +23,6 @@ const App: React.FC = () => {
   const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number } | null>(null);
-  const [vortexMode, setVortexMode] = useState(false);
   const [crateOpen, setCrateOpen] = useState(false);
   const [crateCount, setCrateCount] = useState(() => getCrate().length);
   const [chartOpen, setChartOpen] = useState(false);
@@ -106,6 +104,62 @@ const App: React.FC = () => {
     setTimeout(() => setFlyToTarget(null), 3000);
   }, []);
 
+  const handleDropSubmit = async (data: {
+    title: string;
+    artist: string;
+    coverUrl: string;
+    sourceType: 'itunes' | 'youtube' | 'spotify';
+    externalId?: string;
+    searchTerm?: string;
+  }) => {
+    setIsDropModalOpen(false);
+
+    let newVinyl: VinylRecord;
+
+    if (data.searchTerm) {
+      const tracks = await fetchTrackSearch(data.searchTerm);
+      if (tracks.length > 0) {
+        // Place it near New York by default for custom searches
+        newVinyl = { ...tracks[0], lat: 40.7 + (Math.random() - 0.5), lng: -74 + (Math.random() - 0.5), isOwner: true };
+      } else {
+        return;
+      }
+    } else {
+      newVinyl = {
+        id: `custom-${Date.now()}`,
+        albumId: `ext-${Date.now()}`,
+        title: data.title,
+        artist: data.artist,
+        year: new Date().getFullYear(),
+        coverUrl: data.coverUrl,
+        sourceType: data.sourceType,
+        externalId: data.externalId,
+        lat: 40.7 + (Math.random() - 0.5),
+        lng: -74 + (Math.random() - 0.5),
+        listenerCount: 1,
+        genre: ['User Drop'],
+        isPlaying: false,
+        isOwner: true,
+        likes: 0,
+        isLiked: false,
+        isJoined: true,
+        isFollowed: true,
+        circadianColor: '#FFD700',
+        circadianMood: 'Your Pick',
+      };
+    }
+
+    setRegions(prev => {
+      const userRegion = prev['user'] || { id: 'user', status: 'loaded', data: [] };
+      return {
+        ...prev,
+        user: { ...userRegion, data: [...userRegion.data, newVinyl] }
+      };
+    });
+
+    setSelectedVinyl(newVinyl);
+  };
+
   const autoPilot = useAutoPilot(handleFlyTo);
 
   const handleAutoPilotToggle = useCallback(() => {
@@ -123,62 +177,60 @@ const App: React.FC = () => {
         <WelcomeScreen skipWelcome={isDeepLink} onDismiss={() => setWelcomeDismissed(true)} />
       )}
 
-      {vortexMode && <VinylVortex onClose={() => setVortexMode(false)} />}
+      <GlobeScene
+        vinyls={allVinyls} regions={regions} onVinylClick={handleVinylClickWithAutoPilotStop}
+        audioUnlocked={audioUnlocked} flyToTarget={flyToTarget} onVisibleRegionsChange={handleVisibleRegions}
+      />
 
-      {!vortexMode && (
-        <GlobeScene
-          vinyls={allVinyls} regions={regions} onVinylClick={handleVinylClickWithAutoPilotStop}
-          audioUnlocked={audioUnlocked} flyToTarget={flyToTarget} onVisibleRegionsChange={handleVisibleRegions}
+      <>
+        {!autoPilot.active && <SearchBar onFlyTo={handleFlyTo} />}
+        <Hud
+          onDropVinyl={() => setIsDropModalOpen(true)}
+          onOpenCrate={() => setCrateOpen(true)}
+          onOpenChart={() => setChartOpen(true)}
+          onAutoPilotToggle={handleAutoPilotToggle}
+          autoPilotActive={autoPilot.active}
+          crateCount={crateCount}
+          vinylCount={allVinyls.length}
+          isZenMode={autoPilot.active}
         />
-      )}
 
-      {!vortexMode && (
-        <>
-          {!autoPilot.active && <SearchBar onFlyTo={handleFlyTo} />}
-          <Hud
-            onDropVinyl={() => setIsDropModalOpen(true)}
-            onVortex={() => setVortexMode(true)}
-            onOpenCrate={() => setCrateOpen(true)}
-            onOpenChart={() => setChartOpen(true)}
-            onAutoPilotToggle={handleAutoPilotToggle}
-            autoPilotActive={autoPilot.active}
-            crateCount={crateCount}
-            vinylCount={allVinyls.length}
-            isZenMode={autoPilot.active}
+        {!autoPilot.active && <NowPlayingBar vinyls={allVinyls} />}
+        {!autoPilot.active && <ActivityTicker vinyls={allVinyls} />}
+
+        <AutoPilotPanel
+          active={autoPilot.active} cityName={autoPilot.cityName} djIntro={autoPilot.djIntro}
+          track={autoPilot.track} moodColor={autoPilot.moodColor} onTrackClick={handleVinylClickWithAutoPilotStop}
+        />
+
+        <CratePanel
+          open={crateOpen} onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
+          onSelectVinyl={handleVinylClick}
+        />
+        <WorldChart
+          open={chartOpen} onClose={() => setChartOpen(false)} regions={regions}
+          onFlyAndPlay={(vinyl) => {
+            if (autoPilot.active) autoPilot.stop();
+            if (vinyl.lat != null && vinyl.lng != null) handleFlyTo(vinyl.lat, vinyl.lng);
+            setSelectedVinyl(vinyl);
+          }}
+        />
+
+        {selectedVinyl && (
+          <PlayerModal
+            vinyl={selectedVinyl}
+            onClose={() => { setSelectedVinyl(null); setCrateCount(getCrate().length); }}
+            onUpdate={(v) => setSelectedVinyl(v)}
           />
+        )}
 
-          {!autoPilot.active && <NowPlayingBar vinyls={allVinyls} />}
-          {!autoPilot.active && <ActivityTicker vinyls={allVinyls} />}
-
-          <AutoPilotPanel
-            active={autoPilot.active} cityName={autoPilot.cityName} djIntro={autoPilot.djIntro}
-            track={autoPilot.track} moodColor={autoPilot.moodColor} onTrackClick={handleVinylClickWithAutoPilotStop}
+        {isDropModalOpen && (
+          <DropModal 
+            onClose={() => setIsDropModalOpen(false)} 
+            onSubmit={handleDropSubmit} 
           />
-
-          <CratePanel
-            open={crateOpen} onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
-            onSelectVinyl={handleVinylClick}
-          />
-          <WorldChart
-            open={chartOpen} onClose={() => setChartOpen(false)} regions={regions}
-            onFlyAndPlay={(vinyl) => {
-              if (autoPilot.active) autoPilot.stop();
-              if (vinyl.lat != null && vinyl.lng != null) handleFlyTo(vinyl.lat, vinyl.lng);
-              setSelectedVinyl(vinyl);
-            }}
-          />
-
-          {selectedVinyl && (
-            <PlayerModal
-              vinyl={selectedVinyl}
-              onClose={() => { setSelectedVinyl(null); setCrateCount(getCrate().length); }}
-              onUpdate={(v) => setSelectedVinyl(v)}
-            />
-          )}
-
-          {isDropModalOpen && <DropModal onClose={() => setIsDropModalOpen(false)} onSubmit={() => setIsDropModalOpen(false)} />}
-        </>
-      )}
+        )}
+      </>
     </div>
   );
 };
