@@ -13,41 +13,6 @@ export interface AutoPilotState {
   moodColor: string | null;
 }
 
-const speakIntro = (text: string) => {
-  return new Promise<void>((resolve) => {
-    const synth = window.speechSynthesis;
-    if (!synth) {
-      resolve();
-      return;
-    }
-
-    // Cancel any ongoing speech
-    synth.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Pick a high-quality voice if available
-    const voices = synth.getVoices();
-    const preferredVoice = voices.find(v => 
-        (v.name.includes('Google') || v.name.includes('Premium')) && v.lang.startsWith('en')
-    ) || voices.find(v => v.lang.startsWith('en'));
-    
-    if (preferredVoice) utterance.voice = preferredVoice;
-    
-    utterance.pitch = 1.0;
-    utterance.rate = 0.95; // Slightly slower for that "radio" vibe
-    utterance.volume = 1.0;
-
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
-
-    // Duck the music volume
-    audioManager.setVolume(0.2);
-    
-    synth.speak(utterance);
-  });
-};
-
 export function useAutoPilot(onFlyTo: (lat: number, lng: number) => void) {
   const [state, setState] = useState<AutoPilotState>({
     active: false,
@@ -107,19 +72,12 @@ export function useAutoPilot(onFlyTo: (lat: number, lng: number) => void) {
       track,
     }));
 
-    // Play preview if available
+    // Play preview if available (at full volume)
     if (track?.previewUrl) {
+        audioManager.setVolume(1.0);
         audioManager.play(track.previewUrl);
     }
-
-    // Speak the intro
-    if (intro) {
-        await speakIntro(intro);
-        // Fade music back up after intro ends
-        audioManager.setVolume(1.0);
-    }
   }, [onFlyTo]);
-
 
   const start = useCallback(() => {
     activeRef.current = true;
