@@ -217,7 +217,7 @@ const App: React.FC = () => {
 
       {!vortexMode && (
         <>
-          <SearchBar onFlyTo={handleFlyTo} />
+          {!autoPilot.active && <SearchBar onFlyTo={handleFlyTo} />}
           <Hud
             onDropVinyl={() => setIsDropModalOpen(true)}
             onVortex={() => setVortexMode(true)}
@@ -228,17 +228,21 @@ const App: React.FC = () => {
             crateCount={crateCount}
             myVinyl={myVinyl}
             vinylCount={allVinyls.length}
-            regionCount={loadedRegionCount}
-            totalRegions={REGIONS.length}
-            quality={graphicsQuality}
-            onQualityToggle={() => setGraphicsQuality(q => q === 'high' ? 'low' : 'high')}
+            isZenMode={autoPilot.active}
           />
-          <NowPlayingBar vinyls={allVinyls} />
-          <ActivityTicker vinyls={allVinyls} />
+
+          {!autoPilot.active && <NowPlayingBar vinyls={allVinyls} />}
+          {!autoPilot.active && <ActivityTicker vinyls={allVinyls} />}
+
           <AutoPilotPanel
-            active={autoPilot.active} cityName={autoPilot.cityName} djIntro={autoPilot.djIntro}
-            track={autoPilot.track} moodColor={autoPilot.moodColor} onTrackClick={handleVinylClickWithAutoPilotStop}
+            active={autoPilot.active}
+            cityName={autoPilot.cityName}
+            djIntro={autoPilot.djIntro}
+            track={autoPilot.track}
+            moodColor={autoPilot.moodColor}
+            onTrackClick={handleVinylClickWithAutoPilotStop}
           />
+
           <CratePanel
             open={crateOpen} onClose={() => { setCrateOpen(false); setCrateCount(getCrate().length); }}
             onSelectVinyl={handleVinylClick}

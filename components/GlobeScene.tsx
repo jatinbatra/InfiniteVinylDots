@@ -33,23 +33,48 @@ const FlyToController: React.FC<{ target: { lat: number; lng: number } | null }>
   const { camera } = useThree();
   const isAnimating = useRef(false);
   const targetPos = useRef<THREE.Vector3 | null>(null);
+  const startPos = useRef<THREE.Vector3>(new THREE.Vector3());
+  const progress = useRef(0);
 
   useEffect(() => {
     if (target) {
+      startPos.current.copy(camera.position);
       const pos = latLngToSphere(target.lat, target.lng, GLOBE_RADIUS * 2.8);
       targetPos.current = pos;
+      progress.current = 0;
       isAnimating.current = true;
     }
-  }, [target]);
+  }, [target, camera.position]);
 
   useFrame(() => {
     if (!isAnimating.current || !targetPos.current) return;
-    camera.position.lerp(targetPos.current, 0.05);
+    
+    progress.current = Math.min(1, progress.current + 0.015);
+    
+    // Smooth progress using ease-in-out cubic
+    const t = progress.current < 0.5 
+        ? 4 * progress.current * progress.current * progress.current 
+        : 1 - Math.pow(-2 * progress.current + 2, 3) / 2;
+
+    // Linear path
+    const current = new THREE.Vector3().lerpVectors(startPos.current, targetPos.current, t);
+    
+    // Add "Swoop": zoom out mid-flight
+    const swoopIntensity = 2.5;
+    const swoop = Math.sin(t * Math.PI) * swoopIntensity;
+    current.setLength(current.length() + swoop);
+
+    camera.position.copy(current);
     camera.lookAt(0, 0, 0);
-    if (camera.position.distanceTo(targetPos.current) < 0.05) isAnimating.current = false;
+
+    if (progress.current >= 1) {
+        isAnimating.current = false;
+        targetPos.current = null;
+    }
   });
   return null;
 };
+
 
 const CityLabel: React.FC<{ city: typeof REGIONS[0] }> = ({ city }) => {
   const pos = useMemo(() => latLngToSphere(city.lat, city.lng, GLOBE_RADIUS * 1.02), [city.lat, city.lng]);

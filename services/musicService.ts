@@ -143,7 +143,14 @@ class AudioManager {
       }
     }, 50);
   }
+
+  setVolume(volume: number) {
+    if (this.currentAudio) {
+      this.currentAudio.volume = volume;
+    }
+  }
 }
+
 
 export const audioManager = new AudioManager();
 

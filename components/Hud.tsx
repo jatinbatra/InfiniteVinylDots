@@ -11,15 +11,17 @@ interface HudProps {
   crateCount?: number;
   myVinyl?: VinylRecord;
   vinylCount?: number;
+  isZenMode?: boolean;
 }
 
 const Hud: React.FC<HudProps> = ({ 
   onDropVinyl, onVortex, onOpenCrate, onOpenChart, onAutoPilotToggle, 
-  autoPilotActive, crateCount = 0, vinylCount = 0 
+  autoPilotActive, crateCount = 0, vinylCount = 0, isZenMode = false 
 }) => {
   return (
-    <>
+    <div className={`transition-all duration-1000 ${isZenMode ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
       {/* Top Header */}
+
       <div className="fixed top-0 left-0 right-0 p-8 flex justify-between items-start pointer-events-none z-50">
         <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 pointer-events-auto shadow-2xl">
           <h1 className="text-white text-xl font-bold tracking-tight">VinylVerse</h1>
@@ -65,9 +67,10 @@ const Hud: React.FC<HudProps> = ({
         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Drag to Rotate</p>
         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">Scroll to Zoom</p>
       </div>
-    </>
+    </div>
   );
 };
+
 
 const NavButton: React.FC<{ onClick?: () => void; label: string }> = ({ onClick, label }) => (
   <button
